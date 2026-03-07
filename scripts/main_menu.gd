@@ -1,7 +1,7 @@
 extends Control
 
 # ─── Difficulty presets ───────────────────────────────────────────────────────
-const DIFFICULTIES := [
+const DIFFICULTIES: Array[Dictionary] = [
 	{"label": "Easy",   "cols": 3, "rows": 2},
 	{"label": "Medium", "cols": 4, "rows": 3},
 	{"label": "Hard",   "cols": 6, "rows": 4},
@@ -283,7 +283,7 @@ func _build_settings_panel() -> Control:
 
 	_diff_btns.clear()
 	for i in range(DIFFICULTIES.size()):
-		var d   := DIFFICULTIES[i]
+		var d := DIFFICULTIES[i]
 		var btn := _make_button(d["label"])
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var di := i
