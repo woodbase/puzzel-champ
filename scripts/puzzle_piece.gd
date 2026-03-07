@@ -15,8 +15,8 @@ var _dragging: bool = false
 ## Offset between the piece's position and the mouse when drag starts.
 var _drag_offset: Vector2 = Vector2.ZERO
 
-## Default z_index when not dragging.
-const DEFAULT_Z_INDEX: int = 0
+## z_index captured at drag start, restored on drop.
+var _original_z_index: int = 0
 
 ## Elevated z_index while dragging so the piece renders on top.
 const DRAG_Z_INDEX: int = 10
@@ -27,7 +27,6 @@ const SNAP_DISTANCE: float = 20.0
 
 func _ready() -> void:
 	input_pickable = true
-	z_index = DEFAULT_Z_INDEX
 
 
 func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> void:
@@ -57,6 +56,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _start_drag(mouse_pos: Vector2) -> void:
 	_dragging = true
 	_drag_offset = global_position - mouse_pos
+	_original_z_index = z_index
 	z_index = DRAG_Z_INDEX
 
 
@@ -68,10 +68,11 @@ func _update_drag(mouse_pos: Vector2) -> void:
 ## Ends dragging; snaps and locks the piece if close enough to its target.
 func _end_drag() -> void:
 	_dragging = false
-	z_index = DEFAULT_Z_INDEX
+	z_index = _original_z_index
 
-	var distance := global_position.distance_to(correct_position)
+	var correct_global := get_parent().to_global(correct_position)
+	var distance := global_position.distance_to(correct_global)
 	if distance < SNAP_DISTANCE:
-		global_position = correct_position
+		global_position = correct_global
 		is_locked = true
 		piece_placed.emit()
