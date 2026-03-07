@@ -1,0 +1,15 @@
+[gd_scene load_steps=2 format=3 uid="uid://cqmr8y3gfabc"]
+
+[ext_resource type="Script" path="res://scripts/puzzle_board.gd" id="1_b9abc"]
+
+[node name="PuzzleBoard" type="Node2D"]
+script = ExtResource("1_b9abc")
+
+[node name="BackButton" type="Button" parent="."]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 110.0
+offset_bottom = 40.0
+text = "Back to Menu"
+
+[connection signal="pressed" from="BackButton" to="." method="_on_back_button_pressed"]
