@@ -1,0 +1,49 @@
+[gd_scene load_steps=3 format=3 uid="uid://main001"]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="PackedScene" uid="uid://board001" path="res://scenes/puzzle_board.tscn" id="2_board"]
+
+[node name="Main" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_main")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopBar" type="HBoxContainer" parent="VBoxContainer"]
+custom_minimum_size = Vector2(0, 52)
+
+[node name="LoadImageButton" type="Button" parent="VBoxContainer/TopBar"]
+custom_minimum_size = Vector2(140, 0)
+text = "Load Image"
+
+[node name="Separator" type="VSeparator" parent="VBoxContainer/TopBar"]
+
+[node name="DifficultyLabel" type="Label" parent="VBoxContainer/TopBar"]
+text = "Difficulty:"
+vertical_alignment = 1
+
+[node name="DifficultyOption" type="OptionButton" parent="VBoxContainer/TopBar"]
+custom_minimum_size = Vector2(100, 0)
+
+[node name="Spacer" type="Control" parent="VBoxContainer/TopBar"]
+size_flags_horizontal = 3
+
+[node name="StatusLabel" type="Label" parent="VBoxContainer/TopBar"]
+text = "Load an image to start."
+vertical_alignment = 1
+
+[node name="PuzzleBoard" parent="VBoxContainer" instance=ExtResource("2_board")]
+
+[node name="FileDialog" type="FileDialog" parent="."]
+title = "Open Image"
+initial_position = 2
+size = Vector2i(700, 500)
+min_size = Vector2i(400, 300)
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.png,*.jpg,*.jpeg,*.bmp,*.webp ; Image Files")
