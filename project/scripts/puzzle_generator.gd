@@ -49,13 +49,13 @@ static func _fill_polygon(image: Image, polygon: PackedVector2Array) -> void:
 				var t := (float(y) - p1.y) / (p2.y - p1.y)
 				intersections.append(p1.x + t * (p2.x - p1.x))
 		intersections.sort()
-		var i := 0
-		while i + 1 < intersections.size():
-			var x_start := maxi(0, int(ceil(intersections[i])))
-			var x_end := mini(width - 1, int(floor(intersections[i + 1])))
+		var intersection_idx := 0
+		while intersection_idx + 1 < intersections.size():
+			var x_start := maxi(0, int(ceil(intersections[intersection_idx])))
+			var x_end := mini(width - 1, int(floor(intersections[intersection_idx + 1])))
 			for x in range(x_start, x_end + 1):
 				image.set_pixel(x, y, Color.WHITE)
-			i += 2
+			intersection_idx += 2
 
 ## Slices an ImageTexture into a grid of piece textures.
 ## Returns an Array[ImageTexture] ordered row-by-row, left-to-right.
