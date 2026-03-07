@@ -139,26 +139,47 @@ func _cubic_bezier(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: float)
 
 
 ## Creates a masked puzzle-piece texture from the source image.
-## Steps: (1) extract region, (2) create mask, (3) draw polygon into mask,
-## (4) apply mask via blit_rect_mask. Returns the resulting ImageTexture.
+## The texture is expanded uniformly by the maximum OUT-tab protrusion so that
+## tabs are not clipped. The piece cell remains centred in the returned texture,
+## so callers can position a centred Sprite2D at the cell's world-space centre.
+##
+## Steps: (1) expand region by padding, (2) extract expanded pixels,
+## (3) create mask, (4) shift polygon into padded space + fill,
+## (5) apply mask via blit_rect_mask. Returns the resulting ImageTexture.
 func create_piece_texture(image: Image, region: Rect2i, polygon: PackedVector2Array) -> ImageTexture:
-	var region_size := region.size
+	# Padding = maximum extent an OUT tab protrudes beyond the piece bounding box.
+	var tab_depth := float(region.size.x) * TAB_DEPTH_RATIO
+	var padding := int(ceil(tab_depth * _TAB_HEAD_BULGE))
 
-	# Step 1: Extract region from source image.
-	var region_image := Image.create(region_size.x, region_size.y, false, image.get_format())
-	region_image.blit_rect(image, region, Vector2i.ZERO)
-	if region_image.get_format() != Image.FORMAT_RGBA8:
-		region_image.convert(Image.FORMAT_RGBA8)
+	var padded_size := Vector2i(region.size.x + 2 * padding, region.size.y + 2 * padding)
 
-	# Step 2: Create mask image (transparent black by default).
-	var mask_image := Image.create(region_size.x, region_size.y, false, Image.FORMAT_RGBA8)
+	# The desired source rect in image-space (may partially exceed image bounds).
+	var padded_in_src := Rect2i(region.position - Vector2i(padding, padding), padded_size)
+	var img_rect := Rect2i(Vector2i.ZERO, image.get_size())
+	var clamped_src := padded_in_src.intersection(img_rect)
 
-	# Step 3: Draw polygon shape into mask (white = visible).
-	_fill_polygon(mask_image, polygon)
+	# Step 1: Extract expanded region (transparent where out of bounds).
+	var region_image := Image.create(padded_size.x, padded_size.y, false, Image.FORMAT_RGBA8)
+	if clamped_src.size.x > 0 and clamped_src.size.y > 0:
+		var dst_offset := Vector2i(
+			clamped_src.position.x - padded_in_src.position.x,
+			clamped_src.position.y - padded_in_src.position.y
+		)
+		region_image.blit_rect(image, clamped_src, dst_offset)
+
+	# Step 2: Create mask image at padded size (transparent black by default).
+	var mask_image := Image.create(padded_size.x, padded_size.y, false, Image.FORMAT_RGBA8)
+
+	# Step 3: Shift polygon by padding so it aligns with the padded image, then fill.
+	var poly_offset := Vector2(float(padding), float(padding))
+	var offset_polygon := PackedVector2Array()
+	for pt in polygon:
+		offset_polygon.append(pt + poly_offset)
+	_fill_polygon(mask_image, offset_polygon)
 
 	# Step 4: Apply mask to region image.
-	var piece_image := Image.create(region_size.x, region_size.y, false, Image.FORMAT_RGBA8)
-	piece_image.blit_rect_mask(region_image, mask_image, Rect2i(Vector2i.ZERO, region_size), Vector2i.ZERO)
+	var piece_image := Image.create(padded_size.x, padded_size.y, false, Image.FORMAT_RGBA8)
+	piece_image.blit_rect_mask(region_image, mask_image, Rect2i(Vector2i.ZERO, padded_size), Vector2i.ZERO)
 
 	return ImageTexture.create_from_image(piece_image)
 

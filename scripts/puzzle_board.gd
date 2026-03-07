@@ -25,7 +25,7 @@ var _total_pieces: int = 0
 var _placed_pieces: int = 0
 
 ## Generator instance.
-var _generator = null
+var _generator: PuzzleGeneratorScript = null
 
 
 func _ready() -> void:
@@ -40,6 +40,10 @@ func _ready() -> void:
 ## PieceData generate polygon + texture + instantiate PuzzlePiece scene.
 ## Each piece stores its correct world position; pieces spawn randomly.
 func _build_puzzle() -> void:
+	if cols < 1 or rows < 1:
+		push_error("PuzzleBoard: cols and rows must each be at least 1 (got cols=%d, rows=%d)." % [cols, rows])
+		return
+
 	var image := source_texture.get_image()
 	if image == null:
 		return
@@ -93,8 +97,6 @@ func _build_puzzle() -> void:
 			randf_range(half, viewport_size.y - half)
 		)
 		piece.piece_placed.connect(on_piece_placed)
-
-	complete_label.visible = false
 
 
 ## Called by each PuzzlePiece when it snaps into place.
