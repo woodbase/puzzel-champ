@@ -28,7 +28,7 @@ var _total_pieces: int = 0
 var _placed_pieces: int = 0
 
 ## Generator instance.
-var _generator: PuzzleGeneratorScript = null
+var _generator: Object = null
 
 ## HUD label showing piece progress.
 var _counter_label: Label = null
