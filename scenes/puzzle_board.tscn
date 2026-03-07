@@ -1,15 +1,18 @@
-[gd_scene load_steps=2 format=3 uid="uid://cqmr8y3gfabc"]
+[gd_scene load_steps=2 format=3 uid="uid://dvdao2bu05o5y"]
 
-[ext_resource type="Script" path="res://scripts/puzzle_board.gd" id="1_b9abc"]
+[ext_resource type="Script" path="res://scripts/puzzle_board.gd" id="1_board"]
 
 [node name="PuzzleBoard" type="Node2D"]
-script = ExtResource("1_b9abc")
+script = ExtResource("1_board")
 
-[node name="BackButton" type="Button" parent="."]
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 110.0
-offset_bottom = 40.0
-text = "Back to Menu"
-
-[connection signal="pressed" from="BackButton" to="." method="_on_back_button_pressed"]
+[node name="CompleteLabel" type="Label" parent="."]
+offset_left = 300.0
+offset_top = 20.0
+offset_right = 700.0
+offset_bottom = 70.0
+theme_override_font_sizes/font_size = 40
+text = "Puzzle Complete!"
+horizontal_alignment = 1
+vertical_alignment = 1
+[node name="HUD" type="CanvasLayer" parent="."]
+layer = 10

@@ -102,3 +102,11 @@ disabled = true
 [connection signal="value_changed" from="VBoxContainer/SettingsContainer/RowsSpinBox" to="." method="_on_rows_spinbox_value_changed"]
 [connection signal="pressed" from="VBoxContainer/ImportButton" to="." method="_on_import_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/StartButton" to="." method="_on_start_button_pressed"]
+[gd_scene load_steps=2 format=3 uid="uid://main_menu"]
+
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_menu"]
+
+[node name="MainMenu" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_menu")
