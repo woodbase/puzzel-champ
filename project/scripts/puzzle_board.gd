@@ -4,6 +4,7 @@ extends Control
 signal puzzle_complete
 
 const PIECE_SCENE := preload("res://scenes/puzzle_piece.tscn")
+const PuzzleGeneratorScript := preload("res://scripts/puzzle_generator.gd")
 
 var _pieces: Array = []
 var _grid_size: int = 0
@@ -13,7 +14,12 @@ var _placed_count: int = 0
 
 
 ## Clears the current puzzle and builds a new one from the given texture.
-func setup_puzzle(texture: ImageTexture, cols_rows: int) -> void:
+func setup_puzzle(
+		texture: ImageTexture,
+		cols_rows: int,
+		piece_shape: int = PuzzleGeneratorScript.PieceShape.SQUARE,
+		allow_rotation: bool = false
+	) -> void:
 	for piece in _pieces:
 		piece.queue_free()
 	_pieces.clear()
@@ -42,7 +48,7 @@ func setup_puzzle(texture: ImageTexture, cols_rows: int) -> void:
 		(board_size.y - fit_h) * 0.5
 	)
 
-	var textures: Array[ImageTexture] = PuzzleGenerator.generate_pieces(texture, cols_rows)
+	var textures: Array[ImageTexture] = PuzzleGeneratorScript.generate_pieces(texture, cols_rows, piece_shape)
 
 	for i in range(textures.size()):
 		var col := i % cols_rows
@@ -51,7 +57,7 @@ func setup_puzzle(texture: ImageTexture, cols_rows: int) -> void:
 
 		var piece: Control = PIECE_SCENE.instantiate()
 		add_child(piece)
-		piece.setup(textures[i], Vector2i(col, row), correct_pos, _piece_size)
+		piece.setup(textures[i], Vector2i(col, row), correct_pos, _piece_size, allow_rotation)
 		piece.position = Vector2(
 			randf_range(0.0, board_size.x - _piece_size.x),
 			randf_range(0.0, board_size.y - _piece_size.y)

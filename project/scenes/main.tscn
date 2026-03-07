@@ -30,6 +30,18 @@ vertical_alignment = 1
 [node name="DifficultyOption" type="OptionButton" parent="VBoxContainer/TopBar"]
 custom_minimum_size = Vector2(100, 0)
 
+[node name="Separator2" type="VSeparator" parent="VBoxContainer/TopBar"]
+
+[node name="ShapeLabel" type="Label" parent="VBoxContainer/TopBar"]
+text = "Pieces:"
+vertical_alignment = 1
+
+[node name="ShapeOption" type="OptionButton" parent="VBoxContainer/TopBar"]
+custom_minimum_size = Vector2(120, 0)
+
+[node name="RotationCheck" type="CheckButton" parent="VBoxContainer/TopBar"]
+text = "Allow rotation"
+
 [node name="Spacer" type="Control" parent="VBoxContainer/TopBar"]
 size_flags_horizontal = 3
 
