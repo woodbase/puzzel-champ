@@ -70,7 +70,12 @@ func _end_drag() -> void:
 	_dragging = false
 	z_index = _original_z_index
 
-	var correct_global := get_parent().to_global(correct_position)
+	var parent_2d := get_parent() as Node2D
+	if parent_2d == null:
+		push_error("Puzzle piece parent must be a Node2D to compute correct_global position.")
+		return
+
+	var correct_global: Vector2 = parent_2d.to_global(correct_position)
 	var distance := global_position.distance_to(correct_global)
 	if distance < SNAP_DISTANCE:
 		global_position = correct_global
