@@ -12,10 +12,14 @@ config_version=5
 
 config/name="puzzel-champ"
 config/description="A puzzle game with own images"
-run/main_scene="res://scenes/puzzle_board.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 boot_splash/image="res://gfx/splashscreen_2.png"
 config/icon="res://icon.svg"
+
+[autoload]
+
+GameState="*res://scripts/game_state.gd"
 
 [rendering]
 

@@ -14,3 +14,5 @@ theme_override_font_sizes/font_size = 40
 text = "Puzzle Complete!"
 horizontal_alignment = 1
 vertical_alignment = 1
+[node name="HUD" type="CanvasLayer" parent="."]
+layer = 10
