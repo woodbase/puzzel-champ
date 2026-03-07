@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://puzzle_piece"]
+
+[ext_resource type="Script" path="res://scripts/puzzle_piece.gd" id="1_piece"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(80, 80)
+
+[node name="PuzzlePiece" type="Area2D" groups=["puzzle_pieces"]]
+script = ExtResource("1_piece")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
