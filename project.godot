@@ -13,9 +13,14 @@ config_version=5
 config/name="Puzzle Champ"
 config/description="A puzzle game using your own images"
 run/main_scene="res://scenes/splash/splash.tscn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.3", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+GameState="*res://scripts/game_state.gd"
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
