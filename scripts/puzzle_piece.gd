@@ -70,7 +70,7 @@ func _end_drag() -> void:
 	_dragging = false
 	z_index = _original_z_index
 
-	var correct_global := get_parent().to_global(correct_position)
+	var correct_global: Vector2 = (get_parent() as Node2D).to_global(correct_position)
 	var distance := global_position.distance_to(correct_global)
 	if distance < SNAP_DISTANCE:
 		global_position = correct_global
