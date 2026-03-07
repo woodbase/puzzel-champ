@@ -14,8 +14,8 @@ config_version=5
 
 config/name="Puzzel Champ"
 config/description="A puzzle game with your own images"
-config/run/main_scene="res://scenes/main_menu.tscn"
-config/features=PackedStringArray("4.3")
+run/main_scene="res://scenes/main_menu.tscn"
+config/features=PackedStringArray("4.3", "gl_compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
