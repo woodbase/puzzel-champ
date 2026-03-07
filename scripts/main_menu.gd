@@ -423,7 +423,7 @@ func _apply_difficulty(index: int) -> void:
 	# Refresh piece-count label.
 	if _piece_count_lbl != null:
 		var d     := DIFFICULTIES[index]
-		var total := d["cols"] * d["rows"]
+		var total: int = d["cols"] * d["rows"]
 		_piece_count_lbl.text = "%d pieces (%d \u00d7 %d grid)" % [
 			total, d["cols"], d["rows"]
 		]

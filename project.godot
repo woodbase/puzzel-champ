@@ -1,5 +1,7 @@
 ; Engine configuration file.
 ; It's best edited using the editor UI and not directly,
+; since the parser isn't that forgiving.
+; Keep it organized!
 ; since the parameters that go here are not all obvious.
 ;
 ; Format:
@@ -10,10 +12,10 @@ config_version=5
 
 [application]
 
-config/name="Puzzle Champ"
-config/description="A puzzle game using your own images"
-run/main_scene="res://scenes/splash/splash.tscn"
-config/features=PackedStringArray("4.3", "GL Compatibility")
+config/name="Puzzel Champ"
+config/description="A puzzle game with your own images"
+run/main_scene="res://scenes/main_menu.tscn"
+config/features=PackedStringArray("4.3", "gl_compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
