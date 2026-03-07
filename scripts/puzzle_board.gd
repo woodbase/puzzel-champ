@@ -168,12 +168,12 @@ func _build_complete_overlay() -> void:
 	vbox.add_theme_constant_override("separation", 20)
 	margin.add_child(vbox)
 
-	var emoji_lbl := Label.new()
-	emoji_lbl.text = "Puzzle Complete!"
-	emoji_lbl.add_theme_font_size_override("font_size", 40)
-	emoji_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	emoji_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(emoji_lbl)
+	var complete_title_lbl := Label.new()
+	complete_title_lbl.text = "Puzzle Complete!"
+	complete_title_lbl.add_theme_font_size_override("font_size", 40)
+	complete_title_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	complete_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(complete_title_lbl)
 
 	var sub_lbl := Label.new()
 	sub_lbl.text = "Well done – all pieces placed!"
