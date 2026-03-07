@@ -1,4 +1,5 @@
-extends Node
+extends RefCounted
+class_name PuzzleGenerator
 
 enum EdgeType {
 	FLAT,
@@ -20,6 +21,13 @@ class PieceData:
 		}
 
 
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+
+func opposite(edge_type: EdgeType) -> EdgeType:
+	return EdgeType.OUT if edge_type == EdgeType.IN else EdgeType.IN
+
+
 func generate_edges(cols: int, rows: int) -> Array[PieceData]:
 	var pieces: Array[PieceData] = []
 
@@ -33,16 +41,16 @@ func generate_edges(cols: int, rows: int) -> Array[PieceData]:
 
 			# Right edge (shared with neighbour's left edge)
 			if col < cols - 1:
-				var edge_type: EdgeType = EdgeType.IN if randi() % 2 == 0 else EdgeType.OUT
+				var edge_type: EdgeType = EdgeType.IN if rng.randi() % 2 == 0 else EdgeType.OUT
 				piece.edges["right"] = edge_type
 				var neighbour: PieceData = pieces[row * cols + (col + 1)]
-				neighbour.edges["left"] = EdgeType.OUT if edge_type == EdgeType.IN else EdgeType.IN
+				neighbour.edges["left"] = opposite(edge_type)
 
 			# Bottom edge (shared with neighbour's top edge)
 			if row < rows - 1:
-				var edge_type: EdgeType = EdgeType.IN if randi() % 2 == 0 else EdgeType.OUT
+				var edge_type: EdgeType = EdgeType.IN if rng.randi() % 2 == 0 else EdgeType.OUT
 				piece.edges["bottom"] = edge_type
 				var neighbour: PieceData = pieces[(row + 1) * cols + col]
-				neighbour.edges["top"] = EdgeType.OUT if edge_type == EdgeType.IN else EdgeType.IN
+				neighbour.edges["top"] = opposite(edge_type)
 
 	return pieces
