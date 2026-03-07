@@ -5,14 +5,5 @@
 [node name="PuzzleBoard" type="Node2D"]
 script = ExtResource("1_board")
 
-[node name="CompleteLabel" type="Label" parent="."]
-offset_left = 300.0
-offset_top = 20.0
-offset_right = 700.0
-offset_bottom = 70.0
-theme_override_font_sizes/font_size = 40
-text = "Puzzle Complete!"
-horizontal_alignment = 1
-vertical_alignment = 1
 [node name="HUD" type="CanvasLayer" parent="."]
 layer = 10
