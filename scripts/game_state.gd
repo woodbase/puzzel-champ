@@ -16,3 +16,6 @@ var cols: int = 4
 
 ## Number of puzzle rows.
 var rows: int = 3
+
+## Selected piece shape. Possible values: "square", "jigsaw".
+var piece_shape: String = "jigsaw"

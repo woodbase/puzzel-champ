@@ -39,6 +39,9 @@ var _complete_overlay: Control = null
 ## Guard flag: prevents overlapping rebuild calls.
 var _building: bool = false
 
+## Currently selected piece shape key (mirrors GameState.piece_shape).
+var _piece_shape: String = "jigsaw"
+
 
 func _ready() -> void:
 	_generator = PuzzleGeneratorScript.new()
@@ -48,6 +51,7 @@ func _ready() -> void:
 		source_texture = GameState.image_texture
 		cols           = GameState.cols
 		rows           = GameState.rows
+		_piece_shape   = GameState.piece_shape
 
 	_build_hud()
 
@@ -259,14 +263,19 @@ func _build_puzzle() -> void:
 
 	var viewport_size := get_viewport_rect().size
 
+	# Resolve the shape enum value from the string key.
+	var shape_enum: int = PuzzleGeneratorScript.PieceShape.JIGSAW
+	if _piece_shape == "square":
+		shape_enum = PuzzleGeneratorScript.PieceShape.SQUARE
+
 	for pd in piece_data_array:
 		var col: int = pd.grid_pos.x
 		var row: int = pd.grid_pos.y
 
-		# Generate jigsaw polygon and masked texture for this piece.
-		var polygon := _generator.generate_piece_polygon(pd, piece_size)
+		# Generate polygon and masked texture for this piece.
+		var polygon := _generator.generate_piece_polygon(pd, piece_size, shape_enum)
 		var region  := Rect2i(col * piece_size, row * piece_size, piece_size, piece_size)
-		var texture := _generator.create_piece_texture(image, region, polygon)
+		var texture := _generator.create_piece_texture(image, region, polygon, shape_enum)
 
 		# Correct world position is the centre of the grid cell.
 		var correct_pos := Vector2(
