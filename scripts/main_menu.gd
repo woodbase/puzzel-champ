@@ -1,7 +1,7 @@
 extends Control
 
 # ─── Difficulty presets ───────────────────────────────────────────────────────
-const DIFFICULTIES := [
+const DIFFICULTIES: Array[Dictionary] = [
 	{"label": "Easy",   "cols": 3, "rows": 2},
 	{"label": "Medium", "cols": 4, "rows": 3},
 	{"label": "Hard",   "cols": 6, "rows": 4},
@@ -283,7 +283,7 @@ func _build_settings_panel() -> Control:
 
 	_diff_btns.clear()
 	for i in range(DIFFICULTIES.size()):
-		var d: Dictionary = DIFFICULTIES[i]
+		var d := DIFFICULTIES[i]
 		var btn := _make_button(d["label"])
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var di := i
@@ -422,8 +422,8 @@ func _apply_difficulty(index: int) -> void:
 
 	# Refresh piece-count label.
 	if _piece_count_lbl != null:
-		var d: Dictionary = DIFFICULTIES[index]
-		var total: int = d["cols"] * d["rows"]
+		var d     := DIFFICULTIES[index]
+		var total := d["cols"] * d["rows"]
 		_piece_count_lbl.text = "%d pieces (%d \u00d7 %d grid)" % [
 			total, d["cols"], d["rows"]
 		]
@@ -460,7 +460,7 @@ func _on_start_pressed() -> void:
 	if _selected_texture == null:
 		_show_error("Please select an image first.")
 		return
-	var d: Dictionary = DIFFICULTIES[_difficulty_index]
+	var d := DIFFICULTIES[_difficulty_index]
 	GameState.image_texture = _selected_texture
 	GameState.image_path    = _selected_path
 	GameState.gallery_index = _active_gallery_idx
