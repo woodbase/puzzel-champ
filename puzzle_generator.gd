@@ -3,6 +3,9 @@ class_name PuzzleGenerator
 
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
+extends RefCounted
+class_name PuzzleGenerator
+
 enum EdgeType {
 	FLAT,
 	IN,
@@ -23,6 +26,13 @@ class PieceData:
 		}
 
 
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+
+
+func opposite(edge_type: EdgeType) -> EdgeType:
+	return EdgeType.OUT if edge_type == EdgeType.IN else EdgeType.IN
+
+
 func generate_edges(cols: int, rows: int) -> Array[PieceData]:
 	var pieces: Array[PieceData] = []
 
@@ -40,6 +50,7 @@ func generate_edges(cols: int, rows: int) -> Array[PieceData]:
 				piece.edges["right"] = edge_type
 				var neighbour: PieceData = pieces[row * cols + (col + 1)]
 				neighbour.edges["left"] = EdgeType.OUT if edge_type == EdgeType.IN else EdgeType.IN
+				neighbour.edges["left"] = opposite(edge_type)
 
 			# Bottom edge (shared with neighbour's top edge)
 			if row < rows - 1:
@@ -155,3 +166,6 @@ func _add_tab_points(polygon: PackedVector2Array, p_start: Vector2, p_end: Vecto
 func _cubic_bezier(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: float) -> Vector2:
 	var u: float = 1.0 - t
 	return u * u * u * p0 + 3.0 * u * u * t * p1 + 3.0 * u * t * t * p2 + t * t * t * p3
+				neighbour.edges["top"] = opposite(edge_type)
+
+	return pieces
