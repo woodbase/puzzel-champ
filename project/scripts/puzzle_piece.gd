@@ -14,6 +14,12 @@ var _rotation_enabled: bool = false
 var _rotation_snap_tolerance: float = 8.0
 const ROTATION_STEP_DEG: float = 90.0
 
+## Whether visual snap feedback is enabled (set by PuzzleBoard).
+var feedback_visual: bool = true
+
+## Whether haptic snap feedback is enabled (set by PuzzleBoard).
+var feedback_haptic: bool = true
+
 @onready var texture_rect: TextureRect = $TextureRect
 
 
@@ -80,7 +86,26 @@ func _try_snap() -> void:
 		if _rotation_enabled:
 			rotation_degrees = 0.0
 		is_placed = true
+		if feedback_haptic:
+			Input.vibrate_handheld(50)
+		if feedback_visual:
+			_play_snap_animation()
 		piece_placed.emit()
+
+
+## Plays a brief scale-bounce and colour-flash animation on the piece.
+func _play_snap_animation() -> void:
+	# Use a single tween so both phases run sequentially without needing `await`.
+	# Animate `self` so the pivot_offset (set to centre in setup()) is respected.
+	var tween := create_tween()
+
+	# Phase 1: scale up and flash to gold (0.10 s), in parallel.
+	tween.tween_property(self, "scale", Vector2(1.22, 1.22), 0.10)
+	tween.parallel().tween_property(self, "modulate", Color(1.5, 1.3, 0.3, 1.0), 0.10)
+
+	# Phase 2: settle back to normal (0.15 s), in parallel after phase 1 completes.
+	tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.15)
+	tween.parallel().tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.15)
 
 
 func _rotate_piece() -> void:

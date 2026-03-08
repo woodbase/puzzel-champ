@@ -19,3 +19,12 @@ var rows: int = 3
 
 ## Selected piece shape. Possible values: "square", "jigsaw".
 var piece_shape: String = "jigsaw"
+
+## Whether visual snap feedback (scale bounce + colour flash) is enabled.
+var feedback_visual: bool = true
+
+## Whether audio snap feedback (sound effect) is enabled.
+var feedback_audio: bool = true
+
+## Whether haptic snap feedback (device vibration) is enabled.
+var feedback_haptic: bool = true
