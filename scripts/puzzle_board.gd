@@ -478,16 +478,20 @@ func _generate_music_stream() -> AudioStreamWAV:
 	var data := PackedByteArray()
 	data.resize(num_samples * 2)  # 16-bit mono = 2 bytes per sample.
 
+	# Pre-compute loop-invariant fade region length (0.1 s).
+	var fade_samples: int = int(sample_rate * 0.1)
+
 	for i in range(num_samples):
 		var t: float = float(i) / float(sample_rate)
 
 		# Fade the very first and last 0.1 s to avoid a click at the loop point.
+		# fade-out uses (num_samples - 1 - i) so the very last sample is exactly 0,
+		# matching the fade-in start value and eliminating the loop-boundary click.
 		var fade: float = 1.0
-		var fade_samples: int = int(sample_rate * 0.1)
 		if i < fade_samples:
 			fade = float(i) / float(fade_samples)
 		elif i >= num_samples - fade_samples:
-			fade = float(num_samples - i) / float(fade_samples)
+			fade = float(num_samples - 1 - i) / float(fade_samples)
 
 		# Smooth tremolo oscillating between 0.5 and 1.0.
 		var tremolo: float = 0.75 + 0.25 * sin(TAU * tremolo_rate * t)
