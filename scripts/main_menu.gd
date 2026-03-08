@@ -35,6 +35,9 @@ const BTN_COLOR      := Color(0.28, 0.18, 0.52)
 const TEXT_COLOR     := Color(0.88, 0.82, 0.98)
 const SUBTEXT_COLOR  := Color(0.58, 0.55, 0.68)
 
+## Side length (px) of each square gallery thumbnail.
+const THUMBNAIL_SIZE := 96
+
 # ─── State ────────────────────────────────────────────────────────────────────
 var _selected_texture: Texture2D = null
 var _selected_path: String       = ""
@@ -270,7 +273,7 @@ func _build_gallery_panel(portrait_layout: bool = false) -> Control:
 func _build_gallery_item(index: int) -> PanelContainer:
 	var container := PanelContainer.new()
 	# Square thumbnails work equally well for portrait and landscape images.
-	container.custom_minimum_size = Vector2(96, 96)
+	container.custom_minimum_size = Vector2(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_set_gallery_item_style(container, false)
@@ -660,21 +663,18 @@ func _update_content_layout() -> void:
 	new_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	# Swap the old container for the new one in the scene tree.
-	var parent    := _content_row.get_parent()
-	var old_index := _content_row.get_index()
-
-	# Add new_row to the tree first so reparent() has a valid target.
-	parent.add_child(new_row)
+	# add_sibling() inserts new_row right after _content_row so that,
+	# once the old container is freed, new_row lands at the same index.
+	_content_row.add_sibling(new_row)
 
 	# Move the two panels into the new container.
-	_gallery_panel.reparent(new_row)
-	_settings_panel.reparent(new_row)
+	# keep_global_transform=false is correct: Control position is layout-driven.
+	_gallery_panel.reparent(new_row, false)
+	_settings_panel.reparent(new_row, false)
 
-	# Remove and free the old (now empty) container.
-	parent.remove_child(_content_row)
+	# Free the old (now empty) container.
 	_content_row.queue_free()
 	_content_row = new_row
-	parent.move_child(new_row, old_index)
 
 	# Adjust thumbnail grid columns.
 	if _gallery_grid != null:
