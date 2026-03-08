@@ -42,9 +42,17 @@ var _building: bool = false
 ## Currently selected piece shape key (mirrors GameState.piece_shape).
 var _piece_shape: String = "jigsaw"
 
+## AudioStreamPlayer used to play the snap sound effect.
+var _snap_player: AudioStreamPlayer = null
+
+## The settings panel overlay (visibility toggled by the settings button).
+var _settings_panel: Control = null
+
 
 func _ready() -> void:
 	_generator = PuzzleGeneratorScript.new()
+	_snap_player = _create_snap_audio_player()
+	add_child(_snap_player)
 
 	# GameState overrides the editor export vars when coming from the menu.
 	if GameState.image_texture != null:
@@ -88,6 +96,11 @@ func _build_hud() -> void:
 	new_btn.pressed.connect(_on_new_puzzle)
 	hbox.add_child(new_btn)
 
+	var settings_btn := _make_hud_button("⚙")
+	settings_btn.pressed.connect(_toggle_settings_panel)
+	settings_btn.tooltip_text = "Feedback settings"
+	hbox.add_child(settings_btn)
+
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hbox.add_child(spacer)
@@ -100,6 +113,7 @@ func _build_hud() -> void:
 	hbox.add_child(_counter_label)
 
 	_update_counter()
+	_build_settings_panel()
 	_build_complete_overlay()
 
 
@@ -127,6 +141,85 @@ func _make_hud_button(label_text: String) -> Button:
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
+
+
+## Builds a floating settings panel anchored below the HUD bar.
+func _build_settings_panel() -> void:
+	var panel := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.12, 0.10, 0.22, 0.96)
+	ps.corner_radius_top_left     = 8
+	ps.corner_radius_top_right    = 8
+	ps.corner_radius_bottom_left  = 8
+	ps.corner_radius_bottom_right = 8
+	ps.border_width_left   = 1
+	ps.border_width_right  = 1
+	ps.border_width_top    = 1
+	ps.border_width_bottom = 1
+	ps.border_color = Color(0.45, 0.28, 0.78)
+	panel.add_theme_stylebox_override("panel", ps)
+	panel.anchor_left   = 1.0
+	panel.anchor_right  = 1.0
+	panel.anchor_top    = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left   = -220
+	panel.offset_right  = 0
+	panel.offset_top    = HUD_H + 4
+	panel.offset_bottom = HUD_H + 4 + 160
+	panel.visible = false
+	_hud.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left",   12)
+	margin.add_theme_constant_override("margin_right",  12)
+	margin.add_theme_constant_override("margin_top",    10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Feedback Settings"
+	title.add_theme_font_size_override("font_size", 14)
+	title.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
+	vbox.add_child(title)
+
+	vbox.add_child(_make_feedback_toggle(
+		"Visual effects",
+		GameState.feedback_visual,
+		func(on: bool) -> void: GameState.feedback_visual = on
+	))
+	vbox.add_child(_make_feedback_toggle(
+		"Sound effects",
+		GameState.feedback_audio,
+		func(on: bool) -> void: GameState.feedback_audio = on
+	))
+	vbox.add_child(_make_feedback_toggle(
+		"Vibration",
+		GameState.feedback_haptic,
+		func(on: bool) -> void: GameState.feedback_haptic = on
+	))
+
+	_settings_panel = panel
+
+
+## Creates a labelled CheckBox row for the settings panel.
+func _make_feedback_toggle(label_text: String, initial_value: bool, callback: Callable) -> CheckBox:
+	var cb := CheckBox.new()
+	cb.text = label_text
+	cb.button_pressed = initial_value
+	cb.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	cb.add_theme_font_size_override("font_size", 13)
+	cb.toggled.connect(callback)
+	return cb
+
+
+## Toggles the settings panel's visibility.
+func _toggle_settings_panel() -> void:
+	if _settings_panel != null:
+		_settings_panel.visible = not _settings_panel.visible
 
 
 func _build_complete_overlay() -> void:
@@ -317,6 +410,8 @@ func _update_counter() -> void:
 func on_piece_placed() -> void:
 	_placed_pieces += 1
 	_update_counter()
+	if GameState.feedback_audio and _snap_player != null:
+		_snap_player.play()
 	if _placed_pieces >= _total_pieces and _total_pieces > 0:
 		_show_complete()
 
@@ -325,6 +420,43 @@ func on_piece_placed() -> void:
 func _show_complete() -> void:
 	if _complete_overlay != null:
 		_complete_overlay.visible = true
+
+
+## Creates and returns an AudioStreamPlayer loaded with a generated snap sound.
+func _create_snap_audio_player() -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.volume_db = -6.0
+	player.stream = _generate_snap_sound()
+	return player
+
+
+## Generates a short descending-chirp "snap" sound as a raw AudioStreamWAV.
+func _generate_snap_sound() -> AudioStreamWAV:
+	var sample_rate: int = 22050
+	var duration: float  = 0.12
+	var num_samples: int = int(sample_rate * duration)
+
+	var data := PackedByteArray()
+	data.resize(num_samples * 2)  # 16-bit mono = 2 bytes per sample.
+
+	for i in range(num_samples):
+		var t: float        = float(i) / float(sample_rate)
+		var progress: float = float(i) / float(num_samples)
+		# Descending chirp from 880 Hz to 440 Hz with a fast exponential decay.
+		var freq: float     = lerp(880.0, 440.0, progress)
+		var envelope: float = exp(-progress * 28.0)
+		var sample: int     = int(sin(TAU * freq * t) * envelope * 28000.0)
+		sample = clampi(sample, -32768, 32767)
+		# Store as little-endian signed 16-bit.
+		data[i * 2]     = sample & 0xFF
+		data[i * 2 + 1] = (sample >> 8) & 0xFF
+
+	var stream := AudioStreamWAV.new()
+	stream.format    = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate  = sample_rate
+	stream.stereo    = false
+	stream.data      = data
+	return stream
 
 
 ## Returns to the main menu.
