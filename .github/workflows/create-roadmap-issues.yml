@@ -1,0 +1,368 @@
+name: Create Roadmap Issues and Milestones
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  create-milestones-and-issues:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create milestones
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const milestones = [
+              {
+                title: "Milestone 1 – Core Gameplay Stabilization",
+                description: "Ensure the puzzle system is stable and fully playable. A puzzle can be completed without bugs, pieces snap correctly, and the game detects win state reliably."
+              },
+              {
+                title: "Milestone 2 – Responsive Game Logic",
+                description: "Adapt gameplay depending on device type. Desktop supports higher puzzle complexity than mobile. Game remains playable on small screens."
+              },
+              {
+                title: "Milestone 3 – UI Design",
+                description: "Create clear and intuitive UI for both desktop and mobile. UI works on different screen sizes, controls are comfortable on mobile, and desktop UI uses available space efficiently."
+              },
+              {
+                title: "Milestone 4 – Audio System",
+                description: "Add sound effects and optional background music. All core interactions have audio feedback and audio improves player feedback."
+              },
+              {
+                title: "Milestone 5 – Visual Effects and Feedback",
+                description: "Improve player feedback and polish. Game interactions feel responsive and visual feedback improves clarity."
+              },
+              {
+                title: "Milestone 6 – Animation Exploration",
+                description: "Evaluate and implement simple animations. Game includes at least one loading animation and one victory animation."
+              },
+              {
+                title: "Milestone 7 – Content",
+                description: "Add puzzle content. Game includes multiple playable puzzles and difficulty progression."
+              },
+              {
+                title: "Milestone 8 – Performance Optimization",
+                description: "Ensure stable performance on desktop and mobile. Game runs smoothly on target devices."
+              },
+              {
+                title: "Milestone 9 – Release Preparation",
+                description: "Prepare the game for release on itch.io. Game can be downloaded and played from itch.io as first public version."
+              },
+              {
+                title: "Long-Term Improvements (Post-Release)",
+                description: "Optional future features after the initial release."
+              }
+            ];
+
+            const milestoneNumbers = {};
+            for (const ms of milestones) {
+              try {
+                const result = await github.rest.issues.createMilestone({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: ms.title,
+                  description: ms.description
+                });
+                milestoneNumbers[ms.title] = result.data.number;
+                console.log(`Created milestone: ${ms.title} (#${result.data.number})`);
+              } catch (err) {
+                if (err.status === 422) {
+                  // Already exists (possibly closed) – look it up with pagination
+                  let found;
+                  let msPage = 1;
+                  while (!found) {
+                    const list = await github.rest.issues.listMilestones({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      state: 'all',
+                      per_page: 100,
+                      page: msPage
+                    });
+                    if (list.data.length === 0) break;
+                    found = list.data.find(m => m.title === ms.title);
+                    msPage++;
+                  }
+                  if (found) {
+                    milestoneNumbers[ms.title] = found.number;
+                    console.log(`Milestone already exists: ${ms.title} (#${found.number})`);
+                  } else {
+                    console.error(`Could not find existing milestone: ${ms.title}`);
+                  }
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            const issues = [
+              // Milestone 1 – Core Gameplay Stabilization
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Improve puzzle piece generation system",
+                body: "Review and improve the puzzle piece generation system to ensure pieces are generated consistently and correctly for all supported puzzle sizes.\n\n**Acceptance Criteria:**\n- Pieces are generated without gaps or overlaps\n- System works reliably for all supported grid sizes\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Verify correct piece snapping logic",
+                body: "Audit and verify the piece snapping logic to ensure pieces snap to the correct positions reliably.\n\n**Acceptance Criteria:**\n- Pieces snap accurately to their correct slot\n- No false snaps to wrong positions\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Prevent incorrect piece placements",
+                body: "Implement logic to prevent players from placing puzzle pieces in incorrect positions permanently.\n\n**Acceptance Criteria:**\n- Pieces cannot be locked into incorrect positions\n- Misplaced pieces can be moved freely\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Lock pieces when correctly placed",
+                body: "When a puzzle piece is placed in its correct position, lock it in place so it cannot be accidentally moved.\n\n**Acceptance Criteria:**\n- Correctly placed pieces are locked and cannot be dragged\n- Visual or audio feedback confirms the lock\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Implement puzzle completion detection",
+                body: "Implement reliable detection of when all puzzle pieces are correctly placed and the puzzle is complete.\n\n**Acceptance Criteria:**\n- Game detects puzzle completion accurately\n- Win state triggers consistently when all pieces are placed\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Add restart puzzle functionality",
+                body: "Add a button or menu option that allows the player to restart the current puzzle, resetting all pieces to their initial positions.\n\n**Acceptance Criteria:**\n- Restart button is accessible during gameplay\n- Restarting correctly resets all piece positions\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Ensure puzzle works with different piece counts",
+                body: "Test and ensure the puzzle system works correctly across all supported grid sizes and piece counts.\n\n**Acceptance Criteria:**\n- Puzzle is playable and completable at all supported sizes\n- No layout or logic bugs occur at edge-case sizes\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              // Milestone 2 – Responsive Game Logic
+              {
+                milestone: "Milestone 2 – Responsive Game Logic",
+                title: "Detect screen size and device type",
+                body: "Implement detection of the player's screen size and device type (desktop vs mobile) to adapt gameplay accordingly.\n\n**Acceptance Criteria:**\n- Screen size and device type are detected at startup\n- Detection result is used to configure puzzle difficulty\n\n**Milestone:** Responsive Game Logic"
+              },
+              {
+                milestone: "Milestone 2 – Responsive Game Logic",
+                title: "Define puzzle difficulty tiers",
+                body: "Define and implement puzzle difficulty tiers appropriate for desktop and mobile.\n\n- **Desktop:** User defines the number of puzzle pieces freely\n- **Mobile:** Fixed tiers: 3×3, 4×4, 5×5, 8×8\n\n**Acceptance Criteria:**\n- Difficulty tiers are clearly defined and selectable\n- Appropriate tiers are shown per device type\n\n**Milestone:** Responsive Game Logic"
+              },
+              {
+                milestone: "Milestone 2 – Responsive Game Logic",
+                title: "Implement automatic difficulty selection based on screen size",
+                body: "Automatically select an appropriate default puzzle difficulty based on the detected screen size.\n\n**Acceptance Criteria:**\n- Default difficulty is set automatically on first load\n- Mobile defaults to a smaller, manageable puzzle size\n- Desktop defaults to a larger puzzle size\n\n**Milestone:** Responsive Game Logic"
+              },
+              {
+                milestone: "Milestone 2 – Responsive Game Logic",
+                title: "Add optional manual difficulty override",
+                body: "Allow players to manually override the automatically selected difficulty level.\n\n**Acceptance Criteria:**\n- Player can change difficulty from the UI\n- Manual override persists for the current session\n\n**Milestone:** Responsive Game Logic"
+              },
+              {
+                milestone: "Milestone 2 – Responsive Game Logic",
+                title: "Adjust puzzle generation based on difficulty",
+                body: "Update the puzzle generation system to produce puzzles that match the selected difficulty level.\n\n**Acceptance Criteria:**\n- Puzzle piece count matches the selected difficulty\n- Puzzle board layout scales appropriately\n\n**Milestone:** Responsive Game Logic"
+              },
+              // Milestone 3 – UI Design
+              {
+                milestone: "Milestone 3 – UI Design",
+                title: "Design and implement desktop UI",
+                body: "Design and implement the desktop game interface, including:\n\n- Large puzzle workspace\n- Restart button\n- Difficulty selector\n- Optional preview image\n- Menu system\n\n**Acceptance Criteria:**\n- Desktop UI uses available screen space efficiently\n- All listed controls are present and functional\n\n**Milestone:** UI Design"
+              },
+              {
+                milestone: "Milestone 3 – UI Design",
+                title: "Design and implement mobile UI",
+                body: "Design and implement a simplified mobile-friendly game interface, including:\n\n- Simplified interface\n- Larger touch targets\n- Minimal controls\n- Optimized layout for portrait orientation\n\n**Acceptance Criteria:**\n- Controls are comfortable and accessible on mobile\n- Layout works in portrait orientation\n\n**Milestone:** UI Design"
+              },
+              {
+                milestone: "Milestone 3 – UI Design",
+                title: "Implement responsive UI system with layout switching",
+                body: "Implement a responsive UI system that switches layout between desktop and mobile, and scales UI elements based on screen size.\n\n**Acceptance Criteria:**\n- Different layout is applied for desktop vs mobile\n- UI elements scale correctly across screen sizes\n\n**Milestone:** UI Design"
+              },
+              // Milestone 4 – Audio System
+              {
+                milestone: "Milestone 4 – Audio System",
+                title: "Add piece pickup sound effect",
+                body: "Add a sound effect that plays when the player picks up a puzzle piece.\n\n**Acceptance Criteria:**\n- Sound plays reliably on piece pickup\n- Sound is distinct and appropriate\n\n**Milestone:** Audio System"
+              },
+              {
+                milestone: "Milestone 4 – Audio System",
+                title: "Add piece snap sound effect",
+                body: "Add a sound effect that plays when a puzzle piece snaps into its correct position.\n\n**Acceptance Criteria:**\n- Sound plays on successful piece snap\n- Sound is satisfying and distinct from pickup sound\n\n**Milestone:** Audio System"
+              },
+              {
+                milestone: "Milestone 4 – Audio System",
+                title: "Add puzzle completion sound effect",
+                body: "Add a celebratory sound effect that plays when the player completes the puzzle.\n\n**Acceptance Criteria:**\n- Completion sound plays exactly once on puzzle completion\n- Sound is clearly distinguishable from other in-game sounds\n\n**Milestone:** Audio System"
+              },
+              {
+                milestone: "Milestone 4 – Audio System",
+                title: "Add optional background music",
+                body: "Add optional background music that plays during gameplay, with the ability to be toggled on or off.\n\n**Acceptance Criteria:**\n- Background music loops during gameplay\n- Music can be turned off by the player\n\n**Milestone:** Audio System"
+              },
+              {
+                milestone: "Milestone 4 – Audio System",
+                title: "Add volume control option",
+                body: "Add a volume control option that allows the player to adjust or mute game audio.\n\n**Acceptance Criteria:**\n- Volume slider or toggle is accessible from settings\n- Volume setting is applied to all game audio\n\n**Milestone:** Audio System"
+              },
+              // Milestone 5 – Visual Effects and Feedback
+              {
+                milestone: "Milestone 5 – Visual Effects and Feedback",
+                title: "Add snap animation when pieces connect",
+                body: "Add a brief animation when a puzzle piece snaps into its correct position to provide clear visual feedback.\n\n**Acceptance Criteria:**\n- Animation plays on successful snap\n- Animation is smooth and does not interfere with gameplay\n\n**Milestone:** Visual Effects and Feedback"
+              },
+              {
+                milestone: "Milestone 5 – Visual Effects and Feedback",
+                title: "Highlight correct placement area",
+                body: "Visually highlight the correct target area for a puzzle piece as the player drags it near the correct location.\n\n**Acceptance Criteria:**\n- Highlight appears when a piece is dragged close to its correct position\n- Highlight disappears once the piece is placed or moved away\n\n**Milestone:** Visual Effects and Feedback"
+              },
+              {
+                milestone: "Milestone 5 – Visual Effects and Feedback",
+                title: "Add subtle particle effect when puzzle piece locks",
+                body: "Add a subtle particle effect that plays when a puzzle piece locks into its correct position.\n\n**Acceptance Criteria:**\n- Particle effect triggers on piece lock\n- Effect is subtle and does not clutter the screen\n\n**Milestone:** Visual Effects and Feedback"
+              },
+              {
+                milestone: "Milestone 5 – Visual Effects and Feedback",
+                title: "Add victory feedback effect",
+                body: "Add a satisfying visual feedback effect that plays when the player completes the puzzle.\n\n**Acceptance Criteria:**\n- Victory effect triggers on puzzle completion\n- Effect is visually distinct and celebratory\n\n**Milestone:** Visual Effects and Feedback"
+              },
+              // Milestone 6 – Animation Exploration
+              {
+                milestone: "Milestone 6 – Animation Exploration",
+                title: "Prototype loading animations",
+                body: "Investigate and prototype loading animation approaches for the game, including:\n\n- Puzzle pieces assembling animation\n- Puzzle image fade-in\n- Logo / splash animation\n\n**Acceptance Criteria:**\n- At least two loading animation prototypes are created\n- Prototypes are evaluated for fit and performance\n\n**Milestone:** Animation Exploration"
+              },
+              {
+                milestone: "Milestone 6 – Animation Exploration",
+                title: "Prototype victory animations",
+                body: "Investigate and prototype victory animation approaches, including:\n\n- Puzzle glow effect\n- Piece celebration animation\n- Screen confetti or particle effects\n\n**Acceptance Criteria:**\n- At least two victory animation prototypes are created\n- Prototypes are evaluated for fit and performance\n\n**Milestone:** Animation Exploration"
+              },
+              {
+                milestone: "Milestone 6 – Animation Exploration",
+                title: "Select and implement chosen animation system",
+                body: "Review prototypes from animation exploration, select the animation style that best fits the game, and implement the chosen animation system.\n\n**Acceptance Criteria:**\n- Animation style decision is documented\n- Chosen animations are implemented and functional\n- Game includes at least one loading animation and one victory animation\n\n**Milestone:** Animation Exploration"
+              },
+              // Milestone 7 – Content
+              {
+                milestone: "Milestone 7 – Content",
+                title: "Add multiple puzzle images",
+                body: "Add a selection of puzzle images for players to choose from.\n\n**Acceptance Criteria:**\n- At least 3 different puzzle images are available\n- Images are appropriately sized and optimized\n\n**Milestone:** Content"
+              },
+              {
+                milestone: "Milestone 7 – Content",
+                title: "Create difficulty progression",
+                body: "Create a progression of puzzle difficulties for players to work through, from easier to more challenging.\n\n**Acceptance Criteria:**\n- Difficulties are ordered from easy to hard\n- Each difficulty level provides an appropriate challenge\n\n**Milestone:** Content"
+              },
+              {
+                milestone: "Milestone 7 – Content",
+                title: "Ensure puzzles work across device sizes",
+                body: "Test and verify that all puzzle content works correctly across different device screen sizes.\n\n**Acceptance Criteria:**\n- All puzzles are playable on both desktop and mobile\n- No layout issues on any supported screen size\n\n**Milestone:** Content"
+              },
+              // Milestone 8 – Performance Optimization
+              {
+                milestone: "Milestone 8 – Performance Optimization",
+                title: "Optimize puzzle piece rendering",
+                body: "Profile and optimize puzzle piece rendering to improve performance, especially on mobile devices.\n\n**Acceptance Criteria:**\n- Frame rate is stable during gameplay\n- No rendering lag on mid-range mobile devices\n\n**Milestone:** Performance Optimization"
+              },
+              {
+                milestone: "Milestone 8 – Performance Optimization",
+                title: "Reduce draw calls where possible",
+                body: "Identify and reduce unnecessary draw calls in the rendering pipeline.\n\n**Acceptance Criteria:**\n- Draw call count is minimized\n- Performance improvement is measurable\n\n**Milestone:** Performance Optimization"
+              },
+              {
+                milestone: "Milestone 8 – Performance Optimization",
+                title: "Test on low-end mobile devices",
+                body: "Test the game on low-end mobile devices to identify and resolve performance bottlenecks.\n\n**Acceptance Criteria:**\n- Game is tested on at least one low-end device\n- Critical performance issues are identified and resolved\n\n**Milestone:** Performance Optimization"
+              },
+              {
+                milestone: "Milestone 8 – Performance Optimization",
+                title: "Optimize texture sizes",
+                body: "Review and optimize texture sizes to reduce memory usage and improve loading times.\n\n**Acceptance Criteria:**\n- Textures are appropriately sized for their use\n- Memory usage is reduced without visible quality loss\n\n**Milestone:** Performance Optimization"
+              },
+              // Milestone 9 – Release Preparation
+              {
+                milestone: "Milestone 9 – Release Preparation",
+                title: "Create game icon",
+                body: "Design and add a game icon for use on itch.io and as the application icon.\n\n**Acceptance Criteria:**\n- Icon is created and added to the project\n- Icon displays correctly on itch.io and in-app\n\n**Milestone:** Release Preparation"
+              },
+              {
+                milestone: "Milestone 9 – Release Preparation",
+                title: "Create splash screen",
+                body: "Design and implement a splash screen that displays when the game launches.\n\n**Acceptance Criteria:**\n- Splash screen displays on game launch\n- Splash screen transitions smoothly to the main menu\n\n**Milestone:** Release Preparation"
+              },
+              {
+                milestone: "Milestone 9 – Release Preparation",
+                title: "Prepare build exports (Windows, Linux, Android)",
+                body: "Set up and test build exports for all target platforms:\n\n- Windows\n- Linux\n- Android (optional)\n\n**Acceptance Criteria:**\n- Windows and Linux builds are created and tested\n- Android build is created if feasible\n- All builds launch and run correctly\n\n**Milestone:** Release Preparation"
+              },
+              {
+                milestone: "Milestone 9 – Release Preparation",
+                title: "Create itch.io page",
+                body: "Create and publish the game's itch.io page, including:\n\n- Game description\n- Screenshots\n- Gameplay GIF\n- Instructions\n\n**Acceptance Criteria:**\n- itch.io page is live and publicly accessible\n- Page includes all required assets and information\n\n**Milestone:** Release Preparation"
+              },
+              // Long-Term Improvements
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Add puzzle timer",
+                body: "Add a timer that tracks how long the player takes to complete each puzzle.\n\n**Acceptance Criteria:**\n- Timer starts when puzzle begins and stops on completion\n- Timer is displayed in the UI\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Add leaderboards",
+                body: "Implement leaderboards so players can compare their completion times.\n\n**Acceptance Criteria:**\n- Player scores can be submitted to a leaderboard\n- Leaderboard is viewable in-game\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Add daily puzzle",
+                body: "Implement a daily puzzle feature that gives all players the same puzzle to solve each day.\n\n**Acceptance Criteria:**\n- A new puzzle is available each day\n- Daily puzzle is the same for all players\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Implement online puzzle sharing",
+                body: "Allow players to share custom puzzle images online with other players.\n\n**Acceptance Criteria:**\n- Players can upload and share puzzle images\n- Shared puzzles can be accessed by other players\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "More animation polish",
+                body: "Review all animations and add further polish to improve the overall game feel.\n\n**Acceptance Criteria:**\n- Animations feel smooth and polished\n- Player feedback is improved through animation refinements\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              }
+            ];
+
+            // Build a set of existing open issue titles to avoid duplicates
+            const existingIssues = new Set();
+            let page = 1;
+            while (true) {
+              const resp = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+                page
+              });
+              if (resp.data.length === 0) break;
+              for (const i of resp.data) {
+                // Filter out pull requests; we only want actual issues for de-duplication
+                if (!i.pull_request) {
+                  existingIssues.add(i.title);
+                }
+              }
+              page++;
+            }
+
+            for (const issue of issues) {
+              if (existingIssues.has(issue.title)) {
+                console.log(`Skipping already-existing issue: ${issue.title}`);
+                continue;
+              }
+              const milestoneNumber = milestoneNumbers[issue.milestone];
+              if (!milestoneNumber) {
+                console.error(`No milestone number found for "${issue.milestone}" – skipping issue: ${issue.title}`);
+                continue;
+              }
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issue.title,
+                body: issue.body,
+                milestone: milestoneNumber
+              });
+              console.log(`Created issue: ${issue.title}`);
+            }
