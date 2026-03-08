@@ -529,6 +529,9 @@ func _on_new_puzzle() -> void:
 	if _complete_overlay != null:
 		_complete_overlay.visible = false
 
+	if _complete_player != null:
+		_complete_player.stop()
+
 	for piece in get_tree().get_nodes_in_group("puzzle_pieces"):
 		piece.queue_free()
 
