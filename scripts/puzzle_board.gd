@@ -45,8 +45,8 @@ var _piece_shape: String = "jigsaw"
 ## AudioStreamPlayer used to play the snap sound effect.
 var _snap_player: AudioStreamPlayer = null
 
-## AudioStreamPlayer used for looping background music.
-var _music_player: AudioStreamPlayer = null
+## AudioStreamPlayer used to play the puzzle-completion fanfare.
+var _complete_player: AudioStreamPlayer = null
 
 ## The settings panel overlay (visibility toggled by the settings button).
 var _settings_panel: Control = null
@@ -56,6 +56,8 @@ func _ready() -> void:
 	_generator = PuzzleGeneratorScript.new()
 	_snap_player = _create_snap_audio_player()
 	add_child(_snap_player)
+	_complete_player = _create_complete_audio_player()
+	add_child(_complete_player)
 	_music_player = _create_music_player()
 	add_child(_music_player)
 
@@ -435,10 +437,12 @@ func on_piece_placed() -> void:
 		_show_complete()
 
 
-## Displays the completion overlay.
+## Displays the completion overlay and plays the completion fanfare.
 func _show_complete() -> void:
 	if _complete_overlay != null:
 		_complete_overlay.visible = true
+	if GameState.feedback_audio and _complete_player != null:
+		_complete_player.play()
 
 
 ## Creates and returns an AudioStreamPlayer loaded with a generated snap sound.
@@ -548,6 +552,55 @@ func _generate_snap_sound() -> AudioStreamWAV:
 	return stream
 
 
+## Creates and returns an AudioStreamPlayer loaded with a generated completion fanfare.
+func _create_complete_audio_player() -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.volume_db = -3.0
+	player.stream = _generate_completion_sound()
+	return player
+
+
+## Generates a celebratory ascending-arpeggio fanfare as a raw AudioStreamWAV.
+## Four notes of a C-major chord (C5→E5→G5→C6) are played in sequence, each
+## with a soft decay, giving a sound clearly distinct from the short snap chirp.
+func _generate_completion_sound() -> AudioStreamWAV:
+	var sample_rate: int = 22050
+	var duration: float  = 1.0
+	var num_samples: int = int(sample_rate * duration)
+
+	# Ascending C-major arpeggio: C5, E5, G5, C6.
+	var notes: Array[float] = [
+		523.25,  # C5
+		659.25,  # E5
+		783.99,  # G5
+		1046.50, # C6
+	]
+	var note_duration: float = duration / float(notes.size())
+
+	var data := PackedByteArray()
+	data.resize(num_samples * 2)  # 16-bit mono = 2 bytes per sample.
+
+	for i in range(num_samples):
+		var t: float        = float(i) / float(sample_rate)
+		var note_index: int = clampi(int(t / note_duration), 0, notes.size() - 1)
+		var note_t: float   = t - note_index * note_duration
+		var freq: float     = notes[note_index]
+		# Gentle per-note decay so each note is crisp at its onset.
+		var envelope: float = exp(-note_t * 6.0)
+		var sample: int     = int(sin(TAU * freq * t) * envelope * 28000.0)
+		sample = clampi(sample, -32768, 32767)
+		# Store as little-endian signed 16-bit.
+		data[i * 2]     = sample & 0xFF
+		data[i * 2 + 1] = (sample >> 8) & 0xFF
+
+	var stream := AudioStreamWAV.new()
+	stream.format   = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo   = false
+	stream.data     = data
+	return stream
+
+
 ## Returns to the main menu.
 func _on_back_pressed() -> void:
 	if _music_player != null:
@@ -563,6 +616,9 @@ func _on_new_puzzle() -> void:
 
 	if _complete_overlay != null:
 		_complete_overlay.visible = false
+
+	if _complete_player != null:
+		_complete_player.stop()
 
 	for piece in get_tree().get_nodes_in_group("puzzle_pieces"):
 		piece.queue_free()
