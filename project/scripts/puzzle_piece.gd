@@ -3,6 +3,9 @@ extends Control
 ## Emitted when the player drops this piece close enough to its correct position.
 signal piece_placed
 
+## Emitted when the player starts dragging this piece.
+signal piece_picked_up
+
 var grid_position: Vector2i = Vector2i.ZERO
 var correct_position: Vector2 = Vector2.ZERO
 var is_placed: bool = false
@@ -58,6 +61,7 @@ func _gui_input(event: InputEvent) -> void:
 				_dragging = true
 				_drag_offset = event.position
 				move_to_front()
+				piece_picked_up.emit()
 				accept_event()
 			elif _dragging:
 				_dragging = false
