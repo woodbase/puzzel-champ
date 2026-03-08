@@ -349,7 +349,7 @@ func _build_puzzle() -> void:
 	# Calculate piece size (square pieces using the smaller cell dimension).
 	var piece_size: int = min(img_w / cols, img_h / rows)
 
-	var piece_data_array := _generator.generate_edges(cols, rows)
+	var piece_data_array: Array = _generator.generate_edges(cols, rows)
 	_total_pieces  = piece_data_array.size()
 	_placed_pieces = 0
 	_update_counter()
