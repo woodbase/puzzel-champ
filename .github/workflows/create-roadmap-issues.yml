@@ -316,8 +316,32 @@ jobs:
               }
             ];
 
+            // Build a set of existing open issue titles to avoid duplicates
+            const existingIssues = new Set();
+            let page = 1;
+            while (true) {
+              const resp = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+                page
+              });
+              if (resp.data.length === 0) break;
+              for (const i of resp.data) existingIssues.add(i.title);
+              page++;
+            }
+
             for (const issue of issues) {
+              if (existingIssues.has(issue.title)) {
+                console.log(`Skipping already-existing issue: ${issue.title}`);
+                continue;
+              }
               const milestoneNumber = milestoneNumbers[issue.milestone];
+              if (!milestoneNumber) {
+                console.error(`No milestone number found for "${issue.milestone}" – skipping issue: ${issue.title}`);
+                continue;
+              }
               await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
