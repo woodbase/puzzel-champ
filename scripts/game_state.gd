@@ -32,3 +32,6 @@ var feedback_audio: bool = true
 
 ## Whether haptic snap feedback (device vibration) is enabled.
 var feedback_haptic: bool = true
+
+## Whether background music is enabled during gameplay.
+var music_enabled: bool = true
