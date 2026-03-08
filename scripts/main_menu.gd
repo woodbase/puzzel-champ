@@ -14,15 +14,17 @@ const SHAPES: Array[Dictionary] = [
 	{"label": "Jigsaw", "key": "jigsaw"},
 ]
 
-# ─── Built-in gradient palette for the sample gallery ────────────────────────
-const GALLERY_DATA := [
-	{"name": "Sunset",  "c1": Color(0.18, 0.08, 0.42), "c2": Color(0.98, 0.45, 0.10)},
-	{"name": "Ocean",   "c1": Color(0.02, 0.25, 0.55), "c2": Color(0.15, 0.82, 0.88)},
-	{"name": "Forest",  "c1": Color(0.03, 0.28, 0.05), "c2": Color(0.35, 0.82, 0.15)},
-	{"name": "Dream",   "c1": Color(0.38, 0.02, 0.52), "c2": Color(0.95, 0.25, 0.65)},
-	{"name": "Meadow",  "c1": Color(0.70, 0.50, 0.02), "c2": Color(0.25, 0.75, 0.10)},
-	{"name": "Dusk",    "c1": Color(0.05, 0.05, 0.25), "c2": Color(0.85, 0.60, 0.90)},
+# ─── Default puzzle images bundled with the game ─────────────────────────────
+const DEFAULT_IMAGE_PATHS: Array[String] = [
+	"res://gfx/puzzles/pexels-harun-tan-2311991-3980364.jpg",
+	"res://gfx/puzzles/pexels-pixabay-206768.jpg",
+	"res://gfx/puzzles/pexels-pixabay-268533.jpg",
+	"res://gfx/puzzles/pexels-robshumski-1903702.jpg",
+	"res://gfx/puzzles/pexels-connorscottmcmanus-28368352.jpg",
 ]
+
+## Directory inside the user's data folder where uploaded images are stored.
+const USER_GALLERY_DIR := "user://gallery/"
 
 # ─── Colour constants ─────────────────────────────────────────────────────────
 const BG_COLOR       := Color(0.10, 0.12, 0.17)
@@ -41,15 +43,22 @@ var _difficulty_index: int       = 1
 var _shape_index: int            = 1  # default: Jigsaw
 
 var _gallery_textures: Array[ImageTexture] = []
+## Filesystem / resource paths matching each entry in _gallery_textures.
+var _gallery_paths: Array[String]          = []
 var _gallery_items: Array[PanelContainer]  = []
 var _diff_btns: Array[Button]              = []
 var _shape_btns: Array[Button]             = []
 
-var _preview_rect: TextureRect  = null
-var _no_image_lbl: Label        = null
-var _piece_count_lbl: Label     = null
-var _start_btn: Button          = null
-var _file_dialog: FileDialog    = null
+var _preview_rect: TextureRect   = null
+var _no_image_lbl: Label         = null
+var _piece_count_lbl: Label      = null
+var _start_btn: Button           = null
+var _file_dialog: FileDialog     = null
+var _gallery_grid: GridContainer = null  # kept for dynamic item insertion
+## Top-level layout container (HBoxContainer in landscape, VBoxContainer in portrait).
+var _content_row: Control        = null
+var _gallery_panel: Control      = null
+var _settings_panel: Control     = null
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -57,6 +66,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_gallery_textures()
 	_build_ui()
+	get_viewport().size_changed.connect(_on_viewport_size_changed)
 
 	# Restore state from a previous game session.
 	if GameState.image_texture != null:
@@ -79,21 +89,69 @@ func _ready() -> void:
 # ─── Texture generation ───────────────────────────────────────────────────────
 
 func _build_gallery_textures() -> void:
-	for data in GALLERY_DATA:
-		_gallery_textures.append(
-			_create_gradient_texture(data["c1"], data["c2"])
-		)
+	_gallery_textures.clear()
+	_gallery_paths.clear()
+
+	# Load the default puzzle images shipped with the game.
+	for path: String in DEFAULT_IMAGE_PATHS:
+		var img := Image.load_from_file(path)
+		if img != null:
+			_gallery_textures.append(ImageTexture.create_from_image(img))
+			_gallery_paths.append(path)
+
+	# Load any images the user has previously uploaded.
+	_load_user_gallery_textures()
 
 
-## Creates a 200 × 150 vertical gradient image texture.
-func _create_gradient_texture(top: Color, bottom: Color) -> ImageTexture:
-	var img := Image.create(200, 150, false, Image.FORMAT_RGBA8)
-	for y in range(150):
-		var t := float(y) / 149.0
-		var col := top.lerp(bottom, t)
-		for x in range(200):
-			img.set_pixel(x, y, col)
-	return ImageTexture.create_from_image(img)
+## Scans user://gallery/ and appends any saved images to the gallery arrays.
+func _load_user_gallery_textures() -> void:
+	var dir := DirAccess.open(USER_GALLERY_DIR)
+	if dir == null:
+		return
+	var files: Array[String] = []
+	dir.list_dir_begin()
+	var fname := dir.get_next()
+	while fname != "":
+		if not dir.current_is_dir():
+			files.append(fname)
+		fname = dir.get_next()
+	dir.list_dir_end()
+	files.sort()  # stable ordering across sessions
+	for fname2: String in files:
+		var path := USER_GALLERY_DIR + fname2
+		var img := Image.load_from_file(path)
+		if img != null:
+			_gallery_textures.append(ImageTexture.create_from_image(img))
+			_gallery_paths.append(path)
+
+
+## Copies an image file into user://gallery/ and returns the user:// path.
+## Returns "" on failure.  A unique filename is chosen if one already exists.
+func _save_user_image(src_path: String) -> String:
+	# Ensure the directory exists.
+	var abs_dir := ProjectSettings.globalize_path(USER_GALLERY_DIR)
+	if not DirAccess.dir_exists_absolute(abs_dir):
+		DirAccess.make_dir_recursive_absolute(abs_dir)
+
+	var filename := src_path.get_file()
+	var dest_path := USER_GALLERY_DIR + filename
+	# Avoid overwriting an existing file.
+	var counter := 1
+	while FileAccess.file_exists(dest_path):
+		dest_path = USER_GALLERY_DIR + "%s_%d.%s" % [
+			filename.get_basename(), counter, filename.get_extension()
+		]
+		counter += 1
+
+	var data := FileAccess.get_file_as_bytes(src_path)
+	if data.is_empty():
+		return ""
+	var f := FileAccess.open(dest_path, FileAccess.WRITE)
+	if f == null:
+		return ""
+	f.store_buffer(data)
+	f.close()
+	return dest_path
 
 # ─── UI construction ─────────────────────────────────────────────────────────
 
@@ -123,13 +181,23 @@ func _build_ui() -> void:
 	sep.add_theme_color_override("color", Color(0.28, 0.28, 0.40))
 	root_vbox.add_child(sep)
 
-	var content_row := HBoxContainer.new()
+	# Choose a side-by-side (landscape) or stacked (portrait) layout.
+	var vp_size := get_viewport().get_visible_rect().size
+	var is_portrait := vp_size.y > vp_size.x
+	var content_row: BoxContainer
+	if is_portrait:
+		content_row = VBoxContainer.new()
+	else:
+		content_row = HBoxContainer.new()
 	content_row.add_theme_constant_override("separation", 20)
 	content_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_vbox.add_child(content_row)
 
-	content_row.add_child(_build_gallery_panel())
-	content_row.add_child(_build_settings_panel())
+	_gallery_panel  = _build_gallery_panel(is_portrait)
+	_settings_panel = _build_settings_panel()
+	content_row.add_child(_gallery_panel)
+	content_row.add_child(_settings_panel)
+	_content_row = content_row
 
 
 func _build_title_section() -> Control:
@@ -153,7 +221,7 @@ func _build_title_section() -> Control:
 	return vbox
 
 
-func _build_gallery_panel() -> Control:
+func _build_gallery_panel(portrait_layout: bool = false) -> Control:
 	var panel := _make_panel()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical   = Control.SIZE_EXPAND_FILL
@@ -171,17 +239,23 @@ func _build_gallery_panel() -> Control:
 	hdr.add_theme_color_override("font_color", TEXT_COLOR)
 	vbox.add_child(hdr)
 
-	# Thumbnail grid.
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	vbox.add_child(grid)
+	# Scrollable thumbnail grid.
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	_gallery_grid = GridContainer.new()
+	_gallery_grid.columns = 2 if portrait_layout else 3
+	_gallery_grid.add_theme_constant_override("h_separation", 10)
+	_gallery_grid.add_theme_constant_override("v_separation", 10)
+	_gallery_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_gallery_grid)
 
 	_gallery_items.clear()
 	for i in range(_gallery_textures.size()):
 		var item := _build_gallery_item(i)
-		grid.add_child(item)
+		_gallery_grid.add_child(item)
 		_gallery_items.append(item)
 
 	# Upload button.
@@ -190,17 +264,14 @@ func _build_gallery_panel() -> Control:
 	upload_btn.pressed.connect(_on_upload_pressed)
 	vbox.add_child(upload_btn)
 
-	# Bottom spacer so upload stays near the thumbnails.
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(spacer)
-
 	return panel
 
 
 func _build_gallery_item(index: int) -> PanelContainer:
 	var container := PanelContainer.new()
-	container.custom_minimum_size = Vector2(112, 84)
+	# Square thumbnails work equally well for portrait and landscape images.
+	container.custom_minimum_size = Vector2(96, 96)
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_set_gallery_item_style(container, false)
 
@@ -412,7 +483,8 @@ func _set_gallery_item_style(item: PanelContainer, selected: bool) -> void:
 # ─── Selection state ──────────────────────────────────────────────────────────
 
 func _select_gallery_item(index: int) -> void:
-	_apply_selection(_gallery_textures[index], "", index)
+	var path := _gallery_paths[index] if index < _gallery_paths.size() else ""
+	_apply_selection(_gallery_textures[index], path, index)
 
 
 func _apply_selection(texture: Texture2D, path: String, gallery_idx: int) -> void:
@@ -516,7 +588,23 @@ func _on_file_selected(path: String) -> void:
 	if img == null:
 		_show_error("Could not load the selected image.\nPlease choose a valid PNG, JPG, BMP, or WebP file.")
 		return
-	_apply_selection(ImageTexture.create_from_image(img), path, -1)
+
+	# Save the image to user://gallery/ so it is available in future sessions.
+	var saved_path := _save_user_image(path)
+	var use_path := saved_path if saved_path != "" else path
+
+	var tex := ImageTexture.create_from_image(img)
+	_gallery_textures.append(tex)
+	_gallery_paths.append(use_path)
+
+	# Add a new thumbnail to the grid.
+	var new_index := _gallery_textures.size() - 1
+	if _gallery_grid != null:
+		var item := _build_gallery_item(new_index)
+		_gallery_grid.add_child(item)
+		_gallery_items.append(item)
+
+	_apply_selection(tex, use_path, new_index)
 
 
 func _on_start_pressed() -> void:
@@ -540,3 +628,54 @@ func _show_error(msg: String) -> void:
 	add_child(dialog)
 	dialog.popup_centered()
 	dialog.confirmed.connect(dialog.queue_free)
+
+
+# ─── Responsive layout ────────────────────────────────────────────────────────
+
+func _on_viewport_size_changed() -> void:
+	_update_content_layout()
+
+
+## Switches the content row between HBoxContainer (landscape) and
+## VBoxContainer (portrait) depending on the current viewport aspect ratio.
+## Also adjusts the gallery grid column count accordingly.
+func _update_content_layout() -> void:
+	if _content_row == null or _gallery_panel == null or _settings_panel == null:
+		return
+
+	var vp_size     := get_viewport().get_visible_rect().size
+	var want_portrait := vp_size.y > vp_size.x
+	var is_vbox       := _content_row is VBoxContainer
+
+	if want_portrait == is_vbox:
+		return  # Layout already matches the current orientation.
+
+	# Build the replacement container.
+	var new_row: BoxContainer
+	if want_portrait:
+		new_row = VBoxContainer.new()
+	else:
+		new_row = HBoxContainer.new()
+	new_row.add_theme_constant_override("separation", 20)
+	new_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+
+	# Swap the old container for the new one in the scene tree.
+	var parent    := _content_row.get_parent()
+	var old_index := _content_row.get_index()
+
+	# Add new_row to the tree first so reparent() has a valid target.
+	parent.add_child(new_row)
+
+	# Move the two panels into the new container.
+	_gallery_panel.reparent(new_row)
+	_settings_panel.reparent(new_row)
+
+	# Remove and free the old (now empty) container.
+	parent.remove_child(_content_row)
+	_content_row.queue_free()
+	_content_row = new_row
+	parent.move_child(new_row, old_index)
+
+	# Adjust thumbnail grid columns.
+	if _gallery_grid != null:
+		_gallery_grid.columns = 2 if want_portrait else 3
