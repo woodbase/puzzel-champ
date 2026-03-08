@@ -1,102 +1,211 @@
-# Puzzle Champ – Development Roadmap
+# 🧩 Puzzle Champ – Development Roadmap
 
-Goal:  
-Create a polished, fully playable puzzle game built in Godot that can be deployed on itch.io for desktop and mobile.
+## Goal
 
-The game should include responsive UI, sound effects, simple animations, and optimized gameplay for both desktop and mobile devices.
+Create a polished and fully playable jigsaw puzzle game built in **Godot**, designed for deployment on **itch.io** for both **desktop and mobile**.
+
+The game should include:
+
+- responsive UI
+- satisfying puzzle mechanics
+- sound effects
+- simple animations
+- stable performance on multiple devices
+
+Primary focus: **fast path to a playable release**, followed by polish.
 
 ---
 
-# Milestone 1 – Core Gameplay Stabilization
+# Milestone 1 – Core Puzzle System
 
-Goal: Ensure the puzzle system is stable and fully playable.
+Goal: Build a stable and reliable puzzle mechanic.
 
 Tasks:
 
-- Improve puzzle piece generation system
-- Verify correct piece snapping logic
+- Implement puzzle piece generation
+- Slice puzzle image into puzzle pieces
+- Generate puzzle piece shapes
+- Implement drag and drop system
+- Implement snap detection
 - Prevent incorrect piece placements
 - Lock pieces when correctly placed
+- Detect piece connections
+- Merge connected pieces into groups
 - Implement puzzle completion detection
 - Add restart puzzle functionality
-- Ensure puzzle works with different piece counts
 
 Definition of Done:
 
-- A puzzle can be completed without bugs
+- Puzzle pieces move smoothly
 - Pieces snap correctly
-- Game detects win state reliably
+- Incorrect placements are prevented
+- Groups move together when connected
+- Puzzle completion is detected reliably
 
 ---
 
-# Milestone 2 – Responsive Game Logic
+# Milestone 2 – Puzzle Generation & Difficulty
 
-Goal: Adapt gameplay depending on device type.
-
-Desktop should support much higher puzzle complexity than mobile.
+Goal: Support different puzzle sizes and complexities.
 
 Tasks:
 
-- Detect screen size / device type
-- Define puzzle difficulty tiers
+- Implement configurable puzzle grid sizes
+- Generate puzzles dynamically
+- Ensure piece positions randomize correctly
+- Allow puzzle restart with reshuffle
+
+Difficulty tiers:
 
 Desktop:
-- user defines number of puzzle pieces
+- Custom puzzle size selection
+- Large puzzles supported
 
 Mobile:
 - 3x3
 - 4x4
 - 5x5
-- 8x8 puzzles
-
-Implement:
-
-- Automatic difficulty selection based on screen size
-- Optional manual difficulty override
-- Adjust puzzle generation accordingly
+- 8x8
 
 Definition of Done:
 
-- Desktop generates large puzzles
-- Mobile generates smaller puzzles
-- Game remains playable on small screens
+- Puzzles generate correctly
+- Different puzzle sizes work
+- Restart reshuffles puzzle pieces
 
 ---
 
-# Milestone 3 – UI Design
+# Milestone 3 – Responsive Game Logic
 
-Goal: Create clear and intuitive UI for both desktop and mobile.
+Goal: Adapt gameplay depending on device type.
 
 Tasks:
 
-Design Desktop UI
-- Large puzzle workspace
-- Restart button
-- Difficulty selector
-- Optional preview image
-- Menu system
+- Detect screen size / device type
+- Select appropriate puzzle difficulty automatically
+- Allow manual difficulty override
+- Adjust UI layout for device type
 
-Design Mobile UI
-- Simplified interface
-- Larger touch targets
-- Minimal controls
-- Optimized layout for portrait orientation
+Desktop:
 
-Implement responsive UI system:
-- Different layout for desktop and mobile
-- UI scaling based on screen size
+- Supports higher piece counts
+- Larger workspace
+
+Mobile:
+
+- Reduced puzzle size
+- Touch-friendly interaction
 
 Definition of Done:
 
-- UI works on different screen sizes
-- Controls are comfortable on mobile
-- Desktop UI uses available space efficiently
+- Desktop supports larger puzzles
+- Mobile remains comfortable to play
+- Difficulty adapts automatically
 
 ---
 
-# Milestone 4 – Audio System
+# Milestone 4 – UI Design
 
-Goal: Add sound effects and optional background music.
+Goal: Create intuitive and responsive user interfaces.
+
+Tasks:
+
+Desktop UI:
+
+- Large puzzle workspace
+- Restart button
+- Difficulty selector
+- Puzzle preview image
+- Game menu
+
+Mobile UI:
+
+- Simplified layout
+- Large touch targets
+- Minimal controls
+- Portrait layout support
+
+Responsive system:
+
+- Different layout for desktop and mobile
+- Automatic UI scaling
+
+Definition of Done:
+
+- UI works across screen sizes
+- Mobile interface is touch friendly
+- Desktop UI uses space efficiently
+
+---
+
+## Desktop Puzzle Workspace
+
+Goal:
+
+Create a puzzle workspace that mimics how people solve real jigsaw puzzles on a table.
+
+Players should be able to organize pieces, move them freely, and sort them.
+
+Workspace layout:
+
+Reference Image (top-left)
+
+- Shows original puzzle image
+- Click to zoom
+- Optional overlay preview
+
+Sorting Boxes (left panel)
+
+Boxes allow players to organize puzzle pieces.
+
+Examples:
+
+- Edge pieces
+- Sky
+- Buildings
+- Characters
+- Custom categories
+
+Features:
+
+- Drag pieces into boxes
+- Clicking a box opens a **box view**
+- Pieces stored in boxes are removed from the main table
+
+Boxes behave as **piece containers**.
+
+Game HUD (top-right)
+
+Displays:
+
+- Timer
+- Pieces remaining
+- Score
+- Menu button
+
+Puzzle Table (main workspace)
+
+Players can:
+
+- Move pieces freely
+- Leave pieces outside puzzle frame
+- Move connected groups
+- Zoom and pan workspace
+
+Pieces not sorted into boxes remain on the table.
+
+Definition of Done:
+
+- Sorting boxes work
+- Pieces move between boxes and table
+- Puzzle table allows free movement
+- Desktop workspace feels organized
+
+---
+
+# Milestone 5 – Audio System
+
+Goal: Add satisfying audio feedback.
 
 Tasks:
 
@@ -108,21 +217,21 @@ Tasks:
 
 Definition of Done:
 
-- All core interactions have audio feedback
+- All core interactions have audio
 - Audio improves player feedback
 
 ---
 
-# Milestone 5 – Visual Effects and Feedback
+# Milestone 6 – Visual Feedback
 
-Goal: Improve player feedback and polish.
+Goal: Improve gameplay clarity and polish.
 
 Tasks:
 
 - Snap animation when pieces connect
-- Highlight correct placement area
-- Subtle particle effect when puzzle piece locks
-- Victory feedback
+- Highlight correct placement
+- Subtle particle effect when piece locks
+- Puzzle completion effect
 
 Definition of Done:
 
@@ -131,71 +240,73 @@ Definition of Done:
 
 ---
 
-# Milestone 6 – Animation Exploration
+# Milestone 7 – Animation Exploration
 
-Goal: Evaluate and implement simple animations.
+Goal: Introduce simple animations to improve presentation.
 
 Investigate:
 
 Loading animations:
-- Puzzle pieces assembling animation
+
+- Puzzle pieces assembling
 - Puzzle image fade-in
 - Logo / splash animation
 
 Victory animations:
-- Puzzle glow effect
+
+- Puzzle glow
 - Piece celebration animation
-- Screen confetti or particle effects
+- Confetti particles
 
 Tasks:
 
-- Prototype at least two animation approaches
-- Select animation style that fits the game
+- Prototype multiple animation approaches
+- Select animation style
 - Implement chosen animation system
 
 Definition of Done:
 
-- Game includes at least one loading animation
-- Game includes at least one victory animation
+- At least one loading animation
+- At least one victory animation
 
 ---
 
-# Milestone 7 – Content
+# Milestone 8 – Puzzle Content
 
-Goal: Add puzzle content.
+Goal: Add playable puzzle content.
 
 Tasks:
 
 - Add multiple puzzle images
-- Create difficulty progression
-- Ensure puzzles work across device sizes
+- Support puzzles with different aspect ratios
+- Ensure puzzles scale correctly
 
 Definition of Done:
 
-- Game includes multiple playable puzzles
+- Game contains multiple playable puzzles
 
 ---
 
-# Milestone 8 – Performance Optimization
+# Milestone 9 – Performance Optimization
 
-Goal: Ensure stable performance on desktop and mobile.
+Goal: Ensure smooth performance on desktop and mobile.
 
 Tasks:
 
 - Optimize puzzle piece rendering
-- Reduce draw calls where possible
-- Test on low-end mobile devices
+- Reduce draw calls
 - Optimize texture sizes
+- Test on low-end mobile devices
 
 Definition of Done:
 
-- Game runs smoothly on target devices
+- Stable framerate on target devices
 
 ---
 
-# Milestone 9 – Release Preparation
+# Milestone 10 – Release Preparation
 
-Goal: Prepare the game for release on itch.io.
+Goal: Prepare the game for itch.io release.
 
 Tasks:
 
@@ -209,7 +320,7 @@ Exports:
 - Linux
 - Android (optional)
 
-Create itch.io page:
+Prepare itch.io page:
 
 - Game description
 - Screenshots
@@ -218,17 +329,18 @@ Create itch.io page:
 
 Definition of Done:
 
-- Game can be downloaded and played from itch.io
-- First public version released
+- Game can be downloaded and played
+- First public release available on itch.io
 
 ---
 
-# Long-Term Improvements (Post-Release)
+# Post-Release Improvements
 
-Optional future features:
+Possible future features:
 
 - Puzzle timer
 - Leaderboards
 - Daily puzzle
 - Online puzzle sharing
 - More animation polish
+- Custom puzzle uploads
