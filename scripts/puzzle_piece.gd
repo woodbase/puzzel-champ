@@ -3,6 +3,9 @@ extends Area2D
 ## Emitted when this piece snaps into its correct position.
 signal piece_placed
 
+## Emitted when the player starts dragging this piece.
+signal piece_picked_up
+
 ## The correct grid position this piece must snap to.
 @export var correct_position: Vector2 = Vector2.ZERO
 
@@ -58,6 +61,7 @@ func _start_drag(mouse_pos: Vector2) -> void:
 	_drag_offset = global_position - mouse_pos
 	_original_z_index = z_index
 	z_index = DRAG_Z_INDEX
+	piece_picked_up.emit()
 
 
 ## Moves the piece to follow the mouse.
