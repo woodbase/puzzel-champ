@@ -323,6 +323,27 @@ jobs:
                 milestone: "Long-Term Improvements (Post-Release)",
                 title: "More animation polish",
                 body: "Review all animations and add further polish to improve the overall game feel.\n\n**Acceptance Criteria:**\n- Animations feel smooth and polished\n- Player feedback is improved through animation refinements\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Support custom puzzle uploads",
+                body: "Allow players to upload their own custom images to use as puzzles.\n\n**Acceptance Criteria:**\n- Players can upload a custom image from their device\n- Uploaded images are stored for later use\n- Custom images can be selected from the gallery\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              // Desktop Puzzle Workspace features
+              {
+                milestone: "Milestone 3 – UI Design",
+                title: "Implement sorting boxes for puzzle workspace",
+                body: "Add sorting boxes to the desktop puzzle workspace so players can organize puzzle pieces into labeled containers.\n\nFeatures:\n- Drag pieces from the puzzle table into sorting boxes\n- Clicking a box opens a box view showing all pieces stored inside\n- Pieces stored in boxes are removed from the main table\n- Predefined categories (e.g., edge pieces, sky, buildings) and custom categories\n\n**Acceptance Criteria:**\n- Sorting boxes are visible in the left panel of the workspace\n- Players can drag pieces into and out of boxes\n- Pieces stored in boxes are not visible on the main table\n- Box view opens and closes correctly\n\n**Milestone:** UI Design"
+              },
+              {
+                milestone: "Milestone 3 – UI Design",
+                title: "Add reference image panel with zoom to puzzle workspace",
+                body: "Add a reference image panel (top-left of the workspace) showing the original puzzle image, so players can refer to it while solving the puzzle.\n\nFeatures:\n- Shows the original puzzle image in the top-left corner\n- Click to zoom in for a closer look\n- Optional overlay preview over the puzzle table\n\n**Acceptance Criteria:**\n- Reference image is visible and does not obstruct the puzzle workspace\n- Click to zoom works correctly\n- Overlay preview can be toggled on/off\n\n**Milestone:** UI Design"
+              },
+              {
+                milestone: "Milestone 3 – UI Design",
+                title: "Implement zoom and pan for puzzle workspace",
+                body: "Allow players to zoom in/out and pan around the puzzle workspace to make it easier to work with larger puzzles.\n\nFeatures:\n- Zoom in and out of the puzzle table\n- Pan (scroll/drag) around the workspace\n- Pieces remain interactive at all zoom levels\n- Works with both mouse/trackpad (desktop) and touch gestures (mobile)\n\n**Acceptance Criteria:**\n- Players can zoom in to place pieces more precisely\n- Players can pan to reach all areas of a large puzzle\n- Zoom and pan do not interfere with piece dragging\n\n**Milestone:** UI Design"
               }
             ];
 
