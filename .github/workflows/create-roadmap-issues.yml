@@ -71,16 +71,26 @@ jobs:
                 console.log(`Created milestone: ${ms.title} (#${result.data.number})`);
               } catch (err) {
                 if (err.status === 422) {
-                  // Already exists – look it up
-                  const list = await github.rest.issues.listMilestones({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    state: 'open'
-                  });
-                  const found = list.data.find(m => m.title === ms.title);
+                  // Already exists (possibly closed) – look it up with pagination
+                  let found;
+                  let msPage = 1;
+                  while (!found) {
+                    const list = await github.rest.issues.listMilestones({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      state: 'all',
+                      per_page: 100,
+                      page: msPage
+                    });
+                    if (list.data.length === 0) break;
+                    found = list.data.find(m => m.title === ms.title);
+                    msPage++;
+                  }
                   if (found) {
                     milestoneNumbers[ms.title] = found.number;
                     console.log(`Milestone already exists: ${ms.title} (#${found.number})`);
+                  } else {
+                    console.error(`Could not find existing milestone: ${ms.title}`);
                   }
                 } else {
                   throw err;
@@ -328,7 +338,12 @@ jobs:
                 page
               });
               if (resp.data.length === 0) break;
-              for (const i of resp.data) existingIssues.add(i.title);
+              for (const i of resp.data) {
+                // Filter out pull requests; we only want actual issues for de-duplication
+                if (!i.pull_request) {
+                  existingIssues.add(i.title);
+                }
+              }
               page++;
             }
 
