@@ -45,6 +45,9 @@ var _piece_shape: String = "jigsaw"
 ## AudioStreamPlayer used to play the snap sound effect.
 var _snap_player: AudioStreamPlayer = null
 
+## AudioStreamPlayer used for looping background music.
+var _music_player: AudioStreamPlayer = null
+
 ## The settings panel overlay (visibility toggled by the settings button).
 var _settings_panel: Control = null
 
@@ -53,6 +56,8 @@ func _ready() -> void:
 	_generator = PuzzleGeneratorScript.new()
 	_snap_player = _create_snap_audio_player()
 	add_child(_snap_player)
+	_music_player = _create_music_player()
+	add_child(_music_player)
 
 	# GameState overrides the editor export vars when coming from the menu.
 	if GameState.image_texture != null:
@@ -67,6 +72,9 @@ func _ready() -> void:
 		_build_puzzle()
 	else:
 		_show_no_image_message()
+
+	if GameState.music_enabled:
+		_music_player.play()
 
 
 # ─── HUD construction ─────────────────────────────────────────────────────────
@@ -165,7 +173,7 @@ func _build_settings_panel() -> void:
 	panel.offset_left   = -220
 	panel.offset_right  = 0
 	panel.offset_top    = HUD_H + 4
-	panel.offset_bottom = HUD_H + 4 + 160
+	panel.offset_bottom = HUD_H + 4 + 200
 	panel.visible = false
 	_hud.add_child(panel)
 
@@ -181,11 +189,22 @@ func _build_settings_panel() -> void:
 	margin.add_child(vbox)
 
 	var title := Label.new()
-	title.text = "Feedback Settings"
+	title.text = "Settings"
 	title.add_theme_font_size_override("font_size", 14)
 	title.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
 	vbox.add_child(title)
 
+	vbox.add_child(_make_feedback_toggle(
+		"Background music",
+		GameState.music_enabled,
+		func(on: bool) -> void:
+			GameState.music_enabled = on
+			if _music_player != null:
+				if on:
+					_music_player.play()
+				else:
+					_music_player.stop()
+	))
 	vbox.add_child(_make_feedback_toggle(
 		"Visual effects",
 		GameState.feedback_visual,
@@ -430,6 +449,72 @@ func _create_snap_audio_player() -> AudioStreamPlayer:
 	return player
 
 
+## Creates and returns an AudioStreamPlayer loaded with looping background music.
+func _create_music_player() -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.volume_db = -18.0
+	player.stream = _generate_music_stream()
+	return player
+
+
+## Generates a gentle ambient looping background music track as a raw AudioStreamWAV.
+## The track blends three harmonically-related sine waves (a soft major chord) with
+## a slow tremolo so the loop boundary is smooth.
+func _generate_music_stream() -> AudioStreamWAV:
+	var sample_rate: int  = 22050
+	var duration: float   = 6.0  # seconds – long enough not to feel repetitive.
+	var num_samples: int  = int(sample_rate * duration)
+
+	# Frequencies for a calm C-major chord one octave above middle C.
+	var freq_root:  float = 261.63  # C4
+	var freq_third: float = 329.63  # E4
+	var freq_fifth: float = 392.00  # G4
+	# A gentle sub-octave to add warmth.
+	var freq_sub:   float = 130.81  # C3
+
+	# Slow tremolo cycle (matches the loop length so start == end amplitude).
+	var tremolo_rate: float = 1.0 / duration
+
+	var data := PackedByteArray()
+	data.resize(num_samples * 2)  # 16-bit mono = 2 bytes per sample.
+
+	for i in range(num_samples):
+		var t: float = float(i) / float(sample_rate)
+
+		# Fade the very first and last 0.1 s to avoid a click at the loop point.
+		var fade: float = 1.0
+		var fade_samples: int = int(sample_rate * 0.1)
+		if i < fade_samples:
+			fade = float(i) / float(fade_samples)
+		elif i >= num_samples - fade_samples:
+			fade = float(num_samples - i) / float(fade_samples)
+
+		# Smooth tremolo oscillating between 0.5 and 1.0.
+		var tremolo: float = 0.75 + 0.25 * sin(TAU * tremolo_rate * t)
+
+		var wave: float = (
+			sin(TAU * freq_root  * t) * 0.40 +
+			sin(TAU * freq_third * t) * 0.30 +
+			sin(TAU * freq_fifth * t) * 0.20 +
+			sin(TAU * freq_sub   * t) * 0.10
+		)
+
+		var amplitude: int = int(wave * tremolo * fade * 10000.0)
+		amplitude = clampi(amplitude, -32768, 32767)
+		data[i * 2]     = amplitude & 0xFF
+		data[i * 2 + 1] = (amplitude >> 8) & 0xFF
+
+	var stream := AudioStreamWAV.new()
+	stream.format     = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate   = sample_rate
+	stream.stereo     = false
+	stream.loop_mode  = AudioStreamWAV.LOOP_FORWARD
+	stream.loop_begin = 0
+	stream.loop_end   = num_samples
+	stream.data       = data
+	return stream
+
+
 ## Generates a short descending-chirp "snap" sound as a raw AudioStreamWAV.
 func _generate_snap_sound() -> AudioStreamWAV:
 	var sample_rate: int = 22050
@@ -461,6 +546,8 @@ func _generate_snap_sound() -> AudioStreamWAV:
 
 ## Returns to the main menu.
 func _on_back_pressed() -> void:
+	if _music_player != null:
+		_music_player.stop()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
