@@ -366,9 +366,9 @@ func _build_puzzle() -> void:
 		var row: int = pd.grid_pos.y
 
 		# Generate polygon and masked texture for this piece.
-		var polygon := _generator.generate_piece_polygon(pd, piece_size, shape_enum)
+		var polygon: PackedVector2Array = _generator.generate_piece_polygon(pd, piece_size, shape_enum)
 		var region  := Rect2i(col * piece_size, row * piece_size, piece_size, piece_size)
-		var texture := _generator.create_piece_texture(image, region, polygon, shape_enum)
+		var texture: ImageTexture = _generator.create_piece_texture(image, region, polygon, shape_enum)
 
 		# Correct world position is the centre of the grid cell.
 		var correct_pos := Vector2(
