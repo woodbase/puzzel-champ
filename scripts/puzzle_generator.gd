@@ -1,5 +1,11 @@
 extends RefCounted
 
+## Enum for puzzle piece shapes.
+enum PieceShape {
+	SQUARE,
+	JIGSAW
+}
+
 ## Enum for puzzle piece edge types.
 enum EdgeType {
 	FLAT,
@@ -53,10 +59,29 @@ func generate_edges(cols: int, rows: int) -> Array:
 ## Fraction of piece_size used as the tab protrusion depth.
 const TAB_DEPTH_RATIO: float = 0.25
 
+## Generates a polygon for the given piece.
+## shape selects the piece style: PieceShape.SQUARE or PieceShape.JIGSAW.
+## Returns a PackedVector2Array polygon.
+func generate_piece_polygon(piece_data: PieceData, piece_size: int, shape: int = PieceShape.JIGSAW) -> PackedVector2Array:
+	if shape == PieceShape.SQUARE:
+		return _square_polygon(piece_size)
+	return _jigsaw_polygon(piece_data, piece_size)
+
+
+## Returns a plain square polygon with no tabs.
+func _square_polygon(piece_size: int) -> PackedVector2Array:
+	var s := float(piece_size)
+	var polygon := PackedVector2Array()
+	polygon.append(Vector2(0.0, 0.0))
+	polygon.append(Vector2(s, 0.0))
+	polygon.append(Vector2(s, s))
+	polygon.append(Vector2(0.0, s))
+	return polygon
+
+
 ## Generates a jigsaw polygon for the given piece.
 ## tab_depth = piece_size * TAB_DEPTH_RATIO; edges are built in order: top, right, bottom, left.
-## Returns a PackedVector2Array polygon.
-func generate_piece_polygon(piece_data: PieceData, piece_size: int) -> PackedVector2Array:
+func _jigsaw_polygon(piece_data: PieceData, piece_size: int) -> PackedVector2Array:
 	var polygon := PackedVector2Array()
 	var tab_depth: float = piece_size * TAB_DEPTH_RATIO
 	var s: float = float(piece_size)
@@ -139,17 +164,23 @@ func _cubic_bezier(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: float)
 
 
 ## Creates a masked puzzle-piece texture from the source image.
-## The texture is expanded uniformly by the maximum OUT-tab protrusion so that
-## tabs are not clipped. The piece cell remains centred in the returned texture,
-## so callers can position a centred Sprite2D at the cell's world-space centre.
+## For jigsaw pieces the texture is expanded uniformly by the maximum OUT-tab
+## protrusion so that tabs are not clipped. Square pieces use zero padding and
+## the texture matches the cell size exactly.
+## For jigsaw pieces the cell is centred within the padded texture, so callers
+## can position a centred Sprite2D at the cell's world-space centre.
 ##
 ## Steps: (1) expand region by padding, (2) extract expanded pixels,
 ## (3) create mask, (4) shift polygon into padded space + fill,
 ## (5) apply mask via blit_rect_mask. Returns the resulting ImageTexture.
-func create_piece_texture(image: Image, region: Rect2i, polygon: PackedVector2Array) -> ImageTexture:
+func create_piece_texture(image: Image, region: Rect2i, polygon: PackedVector2Array, shape: int = PieceShape.JIGSAW) -> ImageTexture:
 	# Padding = maximum extent an OUT tab protrudes beyond the piece bounding box.
-	var tab_depth := float(region.size.x) * TAB_DEPTH_RATIO
-	var padding := int(ceil(tab_depth * _TAB_HEAD_BULGE))
+	var padding: int
+	if shape == PieceShape.JIGSAW:
+		var tab_depth := float(region.size.x) * TAB_DEPTH_RATIO
+		padding = int(ceil(tab_depth * _TAB_HEAD_BULGE))
+	else:
+		padding = 0
 
 	var padded_size := Vector2i(region.size.x + 2 * padding, region.size.y + 2 * padding)
 

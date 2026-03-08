@@ -8,6 +8,12 @@ const DIFFICULTIES: Array[Dictionary] = [
 	{"label": "Expert", "cols": 8, "rows": 6},
 ]
 
+# ─── Piece shape presets ──────────────────────────────────────────────────────
+const SHAPES: Array[Dictionary] = [
+	{"label": "Square", "key": "square"},
+	{"label": "Jigsaw", "key": "jigsaw"},
+]
+
 # ─── Built-in gradient palette for the sample gallery ────────────────────────
 const GALLERY_DATA := [
 	{"name": "Sunset",  "c1": Color(0.18, 0.08, 0.42), "c2": Color(0.98, 0.45, 0.10)},
@@ -32,10 +38,12 @@ var _selected_texture: Texture2D = null
 var _selected_path: String       = ""
 var _active_gallery_idx: int     = -1
 var _difficulty_index: int       = 1
+var _shape_index: int            = 1  # default: Jigsaw
 
 var _gallery_textures: Array[ImageTexture] = []
 var _gallery_items: Array[PanelContainer]  = []
 var _diff_btns: Array[Button]              = []
+var _shape_btns: Array[Button]             = []
 
 var _preview_rect: TextureRect  = null
 var _no_image_lbl: Label        = null
@@ -62,6 +70,10 @@ func _ready() -> void:
 
 	_apply_difficulty(
 		_find_difficulty_index(GameState.cols, GameState.rows)
+	)
+
+	_apply_shape(
+		_find_shape_index(GameState.piece_shape)
 	)
 
 # ─── Texture generation ───────────────────────────────────────────────────────
@@ -296,6 +308,27 @@ func _build_settings_panel() -> Control:
 	_piece_count_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
 	vbox.add_child(_piece_count_lbl)
 
+	# ── Piece Shape ──
+	var shape_hdr := Label.new()
+	shape_hdr.text = "Piece Shape"
+	shape_hdr.add_theme_font_size_override("font_size", 20)
+	shape_hdr.add_theme_color_override("font_color", TEXT_COLOR)
+	vbox.add_child(shape_hdr)
+
+	var shape_row := HBoxContainer.new()
+	shape_row.add_theme_constant_override("separation", 8)
+	vbox.add_child(shape_row)
+
+	_shape_btns.clear()
+	for i in range(SHAPES.size()):
+		var s := SHAPES[i]
+		var btn := _make_button(s["label"])
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var si := i
+		btn.pressed.connect(func() -> void: _apply_shape(si))
+		shape_row.add_child(btn)
+		_shape_btns.append(btn)
+
 	# Spacer.
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -435,6 +468,36 @@ func _find_difficulty_index(c: int, r: int) -> int:
 			return i
 	return 1  # default: Medium
 
+
+func _apply_shape(index: int) -> void:
+	_shape_index = index
+
+	# Refresh button highlight.
+	for i in range(_shape_btns.size()):
+		var btn := _shape_btns[i]
+		var active := (i == index)
+		var sb := StyleBoxFlat.new()
+		_set_corner_radius(sb, 8)
+		sb.bg_color = ACCENT_COLOR if active else BTN_COLOR
+		if active:
+			sb.border_width_left   = 2
+			sb.border_width_right  = 2
+			sb.border_width_top    = 2
+			sb.border_width_bottom = 2
+			sb.border_color = Color(0.85, 0.75, 1.0)
+		sb.content_margin_left   = 14
+		sb.content_margin_right  = 14
+		sb.content_margin_top    = 10
+		sb.content_margin_bottom = 10
+		btn.add_theme_stylebox_override("normal", sb)
+
+
+func _find_shape_index(key: String) -> int:
+	for i in range(SHAPES.size()):
+		if SHAPES[i]["key"] == key:
+			return i
+	return 1  # default: Jigsaw
+
 # ─── Event handlers ───────────────────────────────────────────────────────────
 
 func _on_upload_pressed() -> void:
@@ -466,6 +529,7 @@ func _on_start_pressed() -> void:
 	GameState.gallery_index = _active_gallery_idx
 	GameState.cols          = d["cols"]
 	GameState.rows          = d["rows"]
+	GameState.piece_shape   = SHAPES[_shape_index]["key"]
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
 
 
