@@ -47,7 +47,9 @@ var _shape_index: int            = 1  # default: Jigsaw
 
 var _gallery_textures: Array[ImageTexture] = []
 ## Filesystem / resource paths matching each entry in _gallery_textures.
-var _gallery_paths: Array[String]          = []
+var _gallery_paths: Array[String]               = []
+## Small (THUMBNAIL_SIZE²) textures used in the gallery grid to save memory.
+var _gallery_thumb_textures: Array[ImageTexture] = []
 var _gallery_items: Array[PanelContainer]  = []
 var _diff_btns: Array[Button]              = []
 var _shape_btns: Array[Button]             = []
@@ -93,17 +95,29 @@ func _ready() -> void:
 
 func _build_gallery_textures() -> void:
 	_gallery_textures.clear()
+	_gallery_thumb_textures.clear()
 	_gallery_paths.clear()
 
 	# Load the default puzzle images shipped with the game.
 	for path: String in DEFAULT_IMAGE_PATHS:
 		var img := Image.load_from_file(path)
 		if img != null:
-			_gallery_textures.append(ImageTexture.create_from_image(img))
+			_gallery_textures.append(null)  # full-res loaded lazily on selection
+			_gallery_thumb_textures.append(_make_thumbnail(img))
 			_gallery_paths.append(path)
 
 	# Load any images the user has previously uploaded.
 	_load_user_gallery_textures()
+
+	# Ensure the gallery always has at least one entry so selection logic
+	# can't produce an index-out-of-bounds error when all loads fail.
+	if _gallery_textures.is_empty():
+		var placeholder := Image.create(THUMBNAIL_SIZE, THUMBNAIL_SIZE, false, Image.FORMAT_RGBA8)
+		placeholder.fill(Color(0.20, 0.22, 0.30))
+		var placeholder_tex := ImageTexture.create_from_image(placeholder)
+		_gallery_textures.append(placeholder_tex)
+		_gallery_thumb_textures.append(placeholder_tex)
+		_gallery_paths.append("")
 
 
 ## Scans user://gallery/ and appends any saved images to the gallery arrays.
@@ -111,12 +125,16 @@ func _load_user_gallery_textures() -> void:
 	var dir := DirAccess.open(USER_GALLERY_DIR)
 	if dir == null:
 		return
+	const ALLOWED_EXTS: Array[String] = ["png", "jpg", "jpeg", "bmp", "webp"]
 	var files: Array[String] = []
+	# skip_navigational=true skips "." and ".."
+	# skip_hidden=true skips dot-files like .DS_Store
 	dir.list_dir_begin()
 	var fname := dir.get_next()
 	while fname != "":
-		if not dir.current_is_dir():
-			files.append(fname)
+		if not dir.current_is_dir() and not fname.begins_with("."):
+			if ALLOWED_EXTS.has(fname.get_extension().to_lower()):
+				files.append(fname)
 		fname = dir.get_next()
 	dir.list_dir_end()
 	files.sort()  # stable ordering across sessions
@@ -124,7 +142,8 @@ func _load_user_gallery_textures() -> void:
 		var path := USER_GALLERY_DIR + fname2
 		var img := Image.load_from_file(path)
 		if img != null:
-			_gallery_textures.append(ImageTexture.create_from_image(img))
+			_gallery_textures.append(null)  # full-res loaded lazily on selection
+			_gallery_thumb_textures.append(_make_thumbnail(img))
 			_gallery_paths.append(path)
 
 
@@ -155,6 +174,14 @@ func _save_user_image(src_path: String) -> String:
 	f.store_buffer(data)
 	f.close()
 	return dest_path
+
+
+## Returns a THUMBNAIL_SIZE × THUMBNAIL_SIZE ImageTexture scaled from *img*.
+## The original Image object is not modified.
+func _make_thumbnail(img: Image) -> ImageTexture:
+	var copy := img.duplicate() as Image
+	copy.resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, Image.INTERPOLATE_BILINEAR)
+	return ImageTexture.create_from_image(copy)
 
 # ─── UI construction ─────────────────────────────────────────────────────────
 
@@ -286,7 +313,7 @@ func _build_gallery_item(index: int) -> PanelContainer:
 	container.add_child(inner)
 
 	var tex_rect := TextureRect.new()
-	tex_rect.texture      = _gallery_textures[index]
+	tex_rect.texture      = _gallery_thumb_textures[index]
 	tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -486,6 +513,11 @@ func _set_gallery_item_style(item: PanelContainer, selected: bool) -> void:
 # ─── Selection state ──────────────────────────────────────────────────────────
 
 func _select_gallery_item(index: int) -> void:
+	# Lazy-load full-resolution texture on first selection.
+	if _gallery_textures[index] == null and _gallery_paths[index] != "":
+		var img := Image.load_from_file(_gallery_paths[index])
+		if img != null:
+			_gallery_textures[index] = ImageTexture.create_from_image(img)
 	var path := _gallery_paths[index] if index < _gallery_paths.size() else ""
 	_apply_selection(_gallery_textures[index], path, index)
 
@@ -598,6 +630,7 @@ func _on_file_selected(path: String) -> void:
 
 	var tex := ImageTexture.create_from_image(img)
 	_gallery_textures.append(tex)
+	_gallery_thumb_textures.append(_make_thumbnail(img))
 	_gallery_paths.append(use_path)
 
 	# Add a new thumbnail to the grid.
