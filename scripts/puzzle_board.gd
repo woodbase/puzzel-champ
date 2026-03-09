@@ -18,6 +18,9 @@ const PIECE_SCENE := preload("res://scenes/puzzle_piece.tscn")
 ## PuzzleGenerator script used to build the puzzle.
 const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 
+## Confetti celebration effect played on puzzle completion.
+const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
+
 ## Height in pixels of the top HUD bar.
 const HUD_H: float = 52.0
 
@@ -35,6 +38,9 @@ var _counter_label: Label = null
 
 ## Fullscreen overlay shown when the puzzle is complete.
 var _complete_overlay: Control = null
+
+## Confetti particle effect shown on puzzle completion.
+var _confetti: Object = null
 
 ## Guard flag: prevents overlapping rebuild calls.
 var _building: bool = false
@@ -417,6 +423,10 @@ func _build_complete_overlay() -> void:
 	new_btn.pressed.connect(_on_new_puzzle)
 	btn_row.add_child(new_btn)
 
+	# Confetti Node2D added after the card so it renders on top of everything.
+	_confetti = ConfettiEffect.new()
+	_hud.add_child(_confetti)
+
 
 ## Shows a message when no image is available (e.g. scene run from the editor).
 func _show_no_image_message() -> void:
@@ -557,12 +567,15 @@ func _on_piece_released() -> void:
 	queue_redraw()
 
 
-## Displays the completion overlay and plays the completion fanfare.
+## Displays the completion overlay, plays the completion fanfare, and launches
+## the confetti victory effect.
 func _show_complete() -> void:
 	if _complete_overlay != null:
 		_complete_overlay.visible = true
 	if GameState.feedback_audio and _complete_player != null:
 		_complete_player.play()
+	if GameState.feedback_visual and _confetti != null:
+		_confetti.start(get_viewport().get_visible_rect().size)
 
 
 ## Creates and returns an AudioStreamPlayer loaded with a generated pickup sound.
@@ -774,6 +787,9 @@ func _on_new_puzzle() -> void:
 
 	if _complete_overlay != null:
 		_complete_overlay.visible = false
+
+	if _confetti != null:
+		_confetti.stop()
 
 	if _complete_player != null:
 		_complete_player.stop()
