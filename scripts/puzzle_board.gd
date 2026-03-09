@@ -59,8 +59,13 @@ var _building: bool = false
 ## Currently selected piece shape key (mirrors GameState.piece_shape).
 var _piece_shape: String = "jigsaw"
 
-## Pixel size of each puzzle piece (set during _build_puzzle).
+## Size of each puzzle piece in screen-space units (set during _build_puzzle).
 var _piece_size: int = 0
+
+## Top-left corner of the puzzle grid in board-local coordinates.
+## Used to centre the board on screen and kept so derived calculations
+## (glow effect, celebration wave) remain correct after layout changes.
+var _puzzle_origin: Vector2 = Vector2.ZERO
 
 ## The piece currently being dragged, or null when nothing is held.
 var _dragged_piece = null
@@ -780,16 +785,33 @@ func _build_puzzle() -> void:
 	var img_w := image.get_width()
 	var img_h := image.get_height()
 
-	# Calculate piece size (square pieces using the smaller cell dimension).
-	var piece_size: int = min(img_w / cols, img_h / rows)
-	_piece_size = piece_size
+	# Base piece size in image-space (square cells, uses the smaller dimension).
+	var image_piece_size: int = min(img_w / cols, img_h / rows)
+
+	var viewport_size := get_viewport_rect().size
+
+	# Scale the puzzle to fill 90 % of the available area below the HUD bar.
+	# Use the largest square cell size that lets all columns and rows fit.
+	var avail_w: float = viewport_size.x * 0.90
+	var avail_h: float = (viewport_size.y - HUD_H) * 0.90
+	var screen_piece_size: float = minf(avail_w / float(cols), avail_h / float(rows))
+	_piece_size = int(screen_piece_size)
+
+	# Centre the puzzle grid on the available canvas area.
+	var puzzle_w: float = screen_piece_size * float(cols)
+	var puzzle_h: float = screen_piece_size * float(rows)
+	_puzzle_origin = Vector2(
+		(viewport_size.x - puzzle_w) * 0.5,
+		HUD_H + ((viewport_size.y - HUD_H) - puzzle_h) * 0.5
+	)
+
+	# Scale factor to resize sprites from image-space to screen-space.
+	var piece_scale: float = screen_piece_size / float(image_piece_size) if image_piece_size > 0 else 1.0
 
 	var piece_data_array: Array = _generator.generate_edges(cols, rows)
 	_total_pieces  = piece_data_array.size()
 	_placed_pieces = 0
 	_update_counter()
-
-	var viewport_size := get_viewport_rect().size
 
 	# Resolve the shape enum value from the string key.
 	var shape_enum: int = PuzzleGeneratorScript.PieceShape.JIGSAW
@@ -802,15 +824,15 @@ func _build_puzzle() -> void:
 		var col: int = pd.grid_pos.x
 		var row: int = pd.grid_pos.y
 
-		# Generate polygon and masked texture for this piece.
-		var polygon: PackedVector2Array = _generator.generate_piece_polygon(pd, piece_size, shape_enum)
-		var region  := Rect2i(col * piece_size, row * piece_size, piece_size, piece_size)
+		# Generate polygon and masked texture in image space.
+		var polygon: PackedVector2Array = _generator.generate_piece_polygon(pd, image_piece_size, shape_enum)
+		var region  := Rect2i(col * image_piece_size, row * image_piece_size, image_piece_size, image_piece_size)
 		var texture: ImageTexture = _generator.create_piece_texture(image, region, polygon, shape_enum)
 
-		# Correct world position is the centre of the grid cell.
+		# Correct world position: centre of the grid cell in screen space.
 		var correct_pos := Vector2(
-			(col + 0.5) * piece_size,
-			(row + 0.5) * piece_size
+			_puzzle_origin.x + (col + 0.5) * screen_piece_size,
+			_puzzle_origin.y + (row + 0.5) * screen_piece_size
 		)
 
 		var piece := PIECE_SCENE.instantiate()
@@ -818,17 +840,19 @@ func _build_puzzle() -> void:
 
 		var sprite    := piece.get_node("Sprite2D") as Sprite2D
 		sprite.texture = texture
+		# Scale the sprite so it displays at screen-space size.
+		sprite.scale = Vector2(piece_scale, piece_scale)
 
-		# Give each piece its own collision shape sized to the piece.
+		# Collision shape sized to the screen-space piece.
 		var col_shape  := piece.get_node("CollisionShape2D") as CollisionShape2D
 		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = Vector2(piece_size, piece_size)
+		rect_shape.size = Vector2(screen_piece_size, screen_piece_size)
 		col_shape.shape = rect_shape
 
 		piece.correct_position = correct_pos
 
-		# Spawn randomly; keep pieces below the HUD bar.
-		var half := piece_size * 0.5
+		# Spawn randomly below the HUD bar.
+		var half: float = screen_piece_size * 0.5
 		piece.position = Vector2(
 			randf_range(half, viewport_size.x - half),
 			randf_range(HUD_H + half, viewport_size.y - half)
@@ -933,7 +957,7 @@ func _show_complete() -> void:
 	if GameState.feedback_visual and _confetti != null:
 		_confetti.start(get_viewport().get_visible_rect().size)
 	if GameState.feedback_visual and _glow_effect != null and _piece_size > 0:
-		var puzzle_rect := Rect2(Vector2.ZERO, Vector2(cols * _piece_size, rows * _piece_size))
+		var puzzle_rect := Rect2(_puzzle_origin, Vector2(cols * _piece_size, rows * _piece_size))
 		_glow_effect.start(puzzle_rect)
 		_play_piece_celebration_wave()
 
@@ -957,8 +981,8 @@ func _play_piece_celebration_wave() -> void:
 		var correct_pos = child.get("correct_position")
 		if correct_pos == null:
 			continue
-		var col: int = int(correct_pos.x / float(_piece_size))
-		var row: int = int(correct_pos.y / float(_piece_size))
+		var col: int = int((correct_pos.x - _puzzle_origin.x) / float(_piece_size))
+		var row: int = int((correct_pos.y - _puzzle_origin.y) / float(_piece_size))
 		var delay: float = float(col + row) * 0.055
 		var tween := create_tween()
 		tween.tween_interval(delay)
