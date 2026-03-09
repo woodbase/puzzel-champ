@@ -27,6 +27,9 @@ const DRAG_Z_INDEX: int = 10
 ## Distance threshold in pixels for snapping to the correct position.
 const SNAP_DISTANCE: float = 20.0
 
+## Golden colour used for the lock-particle burst.
+const PARTICLE_COLOR := Color(1.0, 0.9, 0.3)
+
 
 func _ready() -> void:
 	input_pickable = true
@@ -88,7 +91,49 @@ func _end_drag() -> void:
 			Input.vibrate_handheld(50)
 		if GameState.feedback_visual:
 			_play_snap_animation()
+			_spawn_lock_particles()
 		piece_placed.emit()
+
+
+## Spawns a brief, subtle burst of golden particles at the locked position.
+func _spawn_lock_particles() -> void:
+	var particles := CPUParticles2D.new()
+	add_child(particles)
+
+	# Burst of 12 small golden dots – one-shot, fully simultaneous.
+	particles.one_shot = true
+	particles.explosiveness = 1.0
+	particles.amount = 12
+	particles.lifetime = 0.6
+
+	# Emit from a small area around the piece centre.
+	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	particles.emission_sphere_radius = 4.0
+
+	# Scatter upward with a wide spread and slight gravity.
+	particles.direction = Vector2(0.0, -1.0)
+	particles.spread = 180.0
+	particles.initial_velocity_min = 30.0
+	particles.initial_velocity_max = 70.0
+	particles.gravity = Vector2(0.0, 60.0)
+
+	# Fade out over the particle lifetime via a colour gradient.
+	var color_ramp := Gradient.new()
+	color_ramp.set_color(0, Color(PARTICLE_COLOR.r, PARTICLE_COLOR.g, PARTICLE_COLOR.b, 1.0))
+	color_ramp.set_color(1, Color(PARTICLE_COLOR.r, PARTICLE_COLOR.g, PARTICLE_COLOR.b, 0.0))
+	particles.color_ramp = color_ramp
+
+	# Small square dots.
+	particles.scale_amount_min = 2.0
+	particles.scale_amount_max = 4.0
+
+	# Start emitting, then clean up after the burst finishes.
+	particles.emitting = true
+	var timer := get_tree().create_timer(particles.lifetime + 0.2)
+	timer.timeout.connect(func() -> void:
+		if is_instance_valid(particles):
+			particles.queue_free()
+	)
 
 
 ## Plays a brief scale-bounce and colour-flash animation on the sprite.
