@@ -46,7 +46,7 @@ var _piece_shape: String = "jigsaw"
 var _piece_size: int = 0
 
 ## The piece currently being dragged, or null when nothing is held.
-var _dragged_piece: Area2D = null
+var _dragged_piece = null
 
 ## Pixel radius within which the target highlight is shown.
 const HIGHLIGHT_DISTANCE: float = 60.0
@@ -478,7 +478,7 @@ func on_piece_placed() -> void:
 
 
 ## Called by each PuzzlePiece when the player picks it up.
-func on_piece_picked_up(piece: Area2D) -> void:
+func on_piece_picked_up(piece) -> void:
 	_dragged_piece = piece
 	if GameState.feedback_audio and _pickup_player != null:
 		_pickup_player.play()
