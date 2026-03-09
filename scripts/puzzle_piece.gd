@@ -6,6 +6,9 @@ signal piece_placed
 ## Emitted when the player starts dragging this piece.
 signal piece_picked_up
 
+## Emitted when the player releases this piece (whether or not it snapped).
+signal piece_released
+
 ## The correct grid position this piece must snap to.
 @export var correct_position: Vector2 = Vector2.ZERO
 
@@ -80,6 +83,7 @@ func _end_drag() -> void:
 	var parent_2d := get_parent() as Node2D
 	if parent_2d == null:
 		push_error("Puzzle piece parent must be a Node2D to compute correct_global position.")
+		piece_released.emit()
 		return
 
 	var correct_global: Vector2 = parent_2d.to_global(correct_position)
@@ -93,6 +97,7 @@ func _end_drag() -> void:
 			_play_snap_animation()
 			_spawn_lock_particles()
 		piece_placed.emit()
+	piece_released.emit()
 
 
 ## Spawns a brief, subtle burst of golden particles at the locked position.
