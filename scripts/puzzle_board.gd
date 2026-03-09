@@ -40,7 +40,7 @@ var _counter_label: Label = null
 var _complete_overlay: Control = null
 
 ## Confetti particle effect shown on puzzle completion.
-var _confetti: Node2D = null
+var _confetti: Object = null
 
 ## Guard flag: prevents overlapping rebuild calls.
 var _building: bool = false

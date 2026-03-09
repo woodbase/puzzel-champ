@@ -47,7 +47,6 @@ var _particles: Array = []
 var _spawn_timer: float = 0.0
 var _spawn_accum: float = 0.0
 var _screen_size: Vector2 = Vector2(1152.0, 648.0)
-var _running: bool = false
 
 
 ## Begin the effect.  Call with the current viewport size.
@@ -56,13 +55,11 @@ func start(screen_size: Vector2) -> void:
 	_spawn_timer = 0.0
 	_spawn_accum = 0.0
 	_particles.clear()
-	_running = true
 	set_process(true)
 
 
 ## Immediately halt the effect and clear all particles.
 func stop() -> void:
-	_running = false
 	_particles.clear()
 	set_process(false)
 	queue_redraw()
@@ -98,7 +95,6 @@ func _process(delta: float) -> void:
 	# Once spawning stops and all particles have fallen off-screen, idle.
 	if _spawn_timer >= SPAWN_DURATION and _particles.is_empty():
 		set_process(false)
-		_running = false
 
 
 func _spawn_particle() -> void:
@@ -115,15 +111,11 @@ func _spawn_particle() -> void:
 
 func _draw() -> void:
 	for p: Particle in _particles:
-		var hw: float    = p.w * 0.5
-		var hh: float    = p.h * 0.5
-		var cos_a: float = cos(p.angle)
-		var sin_a: float = sin(p.angle)
-		# Manually rotate the four corners of the rectangle.
-		var corners := PackedVector2Array([
-			p.pos + Vector2(cos_a * (-hw) - sin_a * (-hh), sin_a * (-hw) + cos_a * (-hh)),
-			p.pos + Vector2(cos_a *   hw  - sin_a * (-hh), sin_a *   hw  + cos_a * (-hh)),
-			p.pos + Vector2(cos_a *   hw  - sin_a *   hh,  sin_a *   hw  + cos_a *   hh),
-			p.pos + Vector2(cos_a * (-hw) - sin_a *   hh,  sin_a * (-hw) + cos_a *   hh),
-		])
-		draw_colored_polygon(corners, p.color)
+		var hw: float = p.w * 0.5
+		var hh: float = p.h * 0.5
+		# Use a per-particle transform instead of building a corner array each
+		# frame, avoiding a PackedVector2Array allocation per particle.
+		draw_set_transform(p.pos, p.angle, Vector2.ONE)
+		draw_rect(Rect2(Vector2(-hw, -hh), Vector2(p.w, p.h)), p.color, true)
+	# Restore the default transform so any subsequent drawing is unaffected.
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
