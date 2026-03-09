@@ -71,6 +71,8 @@ var _settings_panel: Control     = null
 ## Title and subtitle labels stored so they can be resized on orientation change.
 var _title_lbl: Label            = null
 var _subtitle_lbl: Label         = null
+## Outer margin container stored so its margins can be updated on layout changes.
+var _outer_margin: MarginContainer = null
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -78,7 +80,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_gallery_textures()
 	_build_ui()
-	get_viewport().size_changed.connect(_on_viewport_size_changed)
+	UIScale.layout_changed.connect(_on_viewport_size_changed)
 
 	# Restore state from a previous game session.
 	if GameState.image_texture != null:
@@ -199,18 +201,18 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 
-	# Outer margin.
-	var outer := MarginContainer.new()
-	outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	outer.add_theme_constant_override("margin_left",   40)
-	outer.add_theme_constant_override("margin_right",  40)
-	outer.add_theme_constant_override("margin_top",    28)
-	outer.add_theme_constant_override("margin_bottom", 28)
-	add_child(outer)
+	# Outer margin – stored so it can be updated when the layout changes.
+	_outer_margin = MarginContainer.new()
+	_outer_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_outer_margin.add_theme_constant_override("margin_left",   UIScale.px(40))
+	_outer_margin.add_theme_constant_override("margin_right",  UIScale.px(40))
+	_outer_margin.add_theme_constant_override("margin_top",    UIScale.px(28))
+	_outer_margin.add_theme_constant_override("margin_bottom", UIScale.px(28))
+	add_child(_outer_margin)
 
 	var root_vbox := VBoxContainer.new()
-	root_vbox.add_theme_constant_override("separation", 16)
-	outer.add_child(root_vbox)
+	root_vbox.add_theme_constant_override("separation", UIScale.px(16))
+	_outer_margin.add_child(root_vbox)
 
 	root_vbox.add_child(_build_title_section())
 
@@ -219,14 +221,13 @@ func _build_ui() -> void:
 	root_vbox.add_child(sep)
 
 	# Choose a side-by-side (landscape) or stacked (portrait) layout.
-	var vp_size := get_viewport().get_visible_rect().size
-	var is_portrait := vp_size.y > vp_size.x
+	var is_portrait := UIScale.is_portrait()
 	var content_row: BoxContainer
 	if is_portrait:
 		content_row = VBoxContainer.new()
 	else:
 		content_row = HBoxContainer.new()
-	content_row.add_theme_constant_override("separation", 20)
+	content_row.add_theme_constant_override("separation", UIScale.px(20))
 	content_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_vbox.add_child(content_row)
 
@@ -241,18 +242,18 @@ func _build_title_section() -> Control:
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
 
-	var portrait := _is_portrait()
+	var portrait := UIScale.is_portrait()
 
 	_title_lbl = Label.new()
 	_title_lbl.text = "Puzzle Champ"
-	_title_lbl.add_theme_font_size_override("font_size", 36 if portrait else 46)
+	_title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(36 if portrait else 46))
 	_title_lbl.add_theme_color_override("font_color", TEXT_COLOR)
 	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_title_lbl)
 
 	_subtitle_lbl = Label.new()
 	_subtitle_lbl.text = "Pick an image from the gallery or upload your own, then start your puzzle!"
-	_subtitle_lbl.add_theme_font_size_override("font_size", 16)
+	_subtitle_lbl.add_theme_font_size_override("font_size", UIScale.font_size(16))
 	_subtitle_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
 	_subtitle_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle_lbl.visible = not portrait
@@ -481,11 +482,12 @@ func _make_button(label_text: String) -> Button:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.add_theme_color_override("font_color", TEXT_COLOR)
-	var portrait := _is_portrait()
-	btn.add_theme_font_size_override("font_size", 18 if portrait else 16)
+	var portrait := UIScale.is_portrait()
+	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
-	var padding_v := 14 if portrait else 10
+	var padding_v := UIScale.px(14.0 if portrait else 10.0)
+	var padding_h := UIScale.px(16.0 if portrait else 14.0)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -493,8 +495,8 @@ func _make_button(label_text: String) -> Button:
 			"hover":   sb.bg_color = BTN_COLOR.lightened(0.20)
 			"pressed": sb.bg_color = BTN_COLOR.darkened(0.15)
 		_set_corner_radius(sb, 8)
-		sb.content_margin_left   = 14
-		sb.content_margin_right  = 14
+		sb.content_margin_left   = padding_h
+		sb.content_margin_right  = padding_h
 		sb.content_margin_top    = padding_v
 		sb.content_margin_bottom = padding_v
 		btn.add_theme_stylebox_override(state, sb)
@@ -686,23 +688,36 @@ func _on_viewport_size_changed() -> void:
 
 
 ## Returns true when the viewport is in portrait orientation (taller than wide).
+## Delegates to UIScale so there is a single source of truth.
 func _is_portrait() -> bool:
-	return get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
+	return UIScale.is_portrait()
 
 
 ## Switches the content row between HBoxContainer (landscape) and
 ## VBoxContainer (portrait) depending on the current viewport aspect ratio.
-## Also adjusts the gallery grid column count accordingly.
+## Also adjusts the gallery grid column count, button sizes, and margins.
 func _update_content_layout() -> void:
 	if _content_row == null or _gallery_panel == null or _settings_panel == null:
 		return
 
-	var vp_size     := get_viewport().get_visible_rect().size
-	var want_portrait := vp_size.y > vp_size.x
+	var want_portrait := UIScale.is_portrait()
 	var is_vbox       := _content_row is VBoxContainer
 
+	# Update outer margins and title regardless of orientation change.
+	if _outer_margin != null:
+		_outer_margin.add_theme_constant_override("margin_left",   UIScale.px(40))
+		_outer_margin.add_theme_constant_override("margin_right",  UIScale.px(40))
+		_outer_margin.add_theme_constant_override("margin_top",    UIScale.px(28))
+		_outer_margin.add_theme_constant_override("margin_bottom", UIScale.px(28))
+
+	if _title_lbl != null:
+		_title_lbl.add_theme_font_size_override(
+			"font_size", UIScale.font_size(36 if want_portrait else 46))
+	if _subtitle_lbl != null:
+		_subtitle_lbl.visible = not want_portrait
+
 	if want_portrait == is_vbox:
-		return  # Layout already matches the current orientation.
+		return  # Container type already matches the current orientation.
 
 	# Build the replacement container.
 	var new_row: BoxContainer
@@ -710,7 +725,7 @@ func _update_content_layout() -> void:
 		new_row = VBoxContainer.new()
 	else:
 		new_row = HBoxContainer.new()
-	new_row.add_theme_constant_override("separation", 20)
+	new_row.add_theme_constant_override("separation", UIScale.px(20))
 	new_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 	# Swap the old container for the new one in the scene tree.
@@ -743,9 +758,3 @@ func _update_content_layout() -> void:
 		# Restore the selection highlight on the active item.
 		if _active_gallery_idx >= 0 and _active_gallery_idx < _gallery_items.size():
 			_set_gallery_item_style(_gallery_items[_active_gallery_idx], true)
-
-	# Update title section for the new orientation.
-	if _title_lbl != null:
-		_title_lbl.add_theme_font_size_override("font_size", 36 if want_portrait else 46)
-	if _subtitle_lbl != null:
-		_subtitle_lbl.visible = not want_portrait
