@@ -46,6 +46,9 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
 			_start_drag(get_global_mouse_position())
+			# Consume the event so overlapping pieces don't also start dragging,
+			# which could cause the wrong piece to snap into an incorrect position.
+			get_viewport().set_input_as_handled()
 
 
 func _input(event: InputEvent) -> void:
