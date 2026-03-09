@@ -38,6 +38,10 @@ const SUBTEXT_COLOR  := Color(0.58, 0.55, 0.68)
 ## Side length (px) of each square gallery thumbnail.
 const THUMBNAIL_SIZE := 96
 
+## Larger thumbnail side length (px) used in portrait / mobile orientation for
+## easier touch targeting.
+const THUMBNAIL_SIZE_PORTRAIT := 120
+
 # ─── State ────────────────────────────────────────────────────────────────────
 var _selected_texture: Texture2D = null
 var _selected_path: String       = ""
@@ -64,6 +68,9 @@ var _gallery_grid: GridContainer = null  # kept for dynamic item insertion
 var _content_row: Control        = null
 var _gallery_panel: Control      = null
 var _settings_panel: Control     = null
+## Title and subtitle labels stored so they can be resized on orientation change.
+var _title_lbl: Label            = null
+var _subtitle_lbl: Label         = null
 
 # ─── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -234,19 +241,22 @@ func _build_title_section() -> Control:
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
 
-	var title := Label.new()
-	title.text = "Puzzle Champ"
-	title.add_theme_font_size_override("font_size", 46)
-	title.add_theme_color_override("font_color", TEXT_COLOR)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
+	var portrait := _is_portrait()
 
-	var sub := Label.new()
-	sub.text = "Pick an image from the gallery or upload your own, then start your puzzle!"
-	sub.add_theme_font_size_override("font_size", 16)
-	sub.add_theme_color_override("font_color", SUBTEXT_COLOR)
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(sub)
+	_title_lbl = Label.new()
+	_title_lbl.text = "Puzzle Champ"
+	_title_lbl.add_theme_font_size_override("font_size", 36 if portrait else 46)
+	_title_lbl.add_theme_color_override("font_color", TEXT_COLOR)
+	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_title_lbl)
+
+	_subtitle_lbl = Label.new()
+	_subtitle_lbl.text = "Pick an image from the gallery or upload your own, then start your puzzle!"
+	_subtitle_lbl.add_theme_font_size_override("font_size", 16)
+	_subtitle_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
+	_subtitle_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle_lbl.visible = not portrait
+	vbox.add_child(_subtitle_lbl)
 
 	return vbox
 
@@ -299,8 +309,9 @@ func _build_gallery_panel(portrait_layout: bool = false) -> Control:
 
 func _build_gallery_item(index: int) -> PanelContainer:
 	var container := PanelContainer.new()
-	# Square thumbnails work equally well for portrait and landscape images.
-	container.custom_minimum_size = Vector2(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+	# Use a larger touch target in portrait / mobile orientation.
+	var thumb_size := THUMBNAIL_SIZE_PORTRAIT if _is_portrait() else THUMBNAIL_SIZE
+	container.custom_minimum_size = Vector2(thumb_size, thumb_size)
 	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	container.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_set_gallery_item_style(container, false)
@@ -470,9 +481,11 @@ func _make_button(label_text: String) -> Button:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.add_theme_color_override("font_color", TEXT_COLOR)
-	btn.add_theme_font_size_override("font_size", 16)
+	var portrait := _is_portrait()
+	btn.add_theme_font_size_override("font_size", 18 if portrait else 16)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
+	var padding_v := 14 if portrait else 10
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -482,8 +495,8 @@ func _make_button(label_text: String) -> Button:
 		_set_corner_radius(sb, 8)
 		sb.content_margin_left   = 14
 		sb.content_margin_right  = 14
-		sb.content_margin_top    = 10
-		sb.content_margin_bottom = 10
+		sb.content_margin_top    = padding_v
+		sb.content_margin_bottom = padding_v
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
@@ -672,6 +685,11 @@ func _on_viewport_size_changed() -> void:
 	_update_content_layout()
 
 
+## Returns true when the viewport is in portrait orientation (taller than wide).
+func _is_portrait() -> bool:
+	return get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
+
+
 ## Switches the content row between HBoxContainer (landscape) and
 ## VBoxContainer (portrait) depending on the current viewport aspect ratio.
 ## Also adjusts the gallery grid column count accordingly.
@@ -712,3 +730,22 @@ func _update_content_layout() -> void:
 	# Adjust thumbnail grid columns.
 	if _gallery_grid != null:
 		_gallery_grid.columns = 2 if want_portrait else 3
+
+	# Rebuild gallery items so they use the orientation-appropriate touch-target size.
+	if _gallery_grid != null:
+		for child in _gallery_grid.get_children():
+			child.free()
+		_gallery_items.clear()
+		for i in range(_gallery_textures.size()):
+			var item := _build_gallery_item(i)
+			_gallery_grid.add_child(item)
+			_gallery_items.append(item)
+		# Restore the selection highlight on the active item.
+		if _active_gallery_idx >= 0 and _active_gallery_idx < _gallery_items.size():
+			_set_gallery_item_style(_gallery_items[_active_gallery_idx], true)
+
+	# Update title section for the new orientation.
+	if _title_lbl != null:
+		_title_lbl.add_theme_font_size_override("font_size", 36 if want_portrait else 46)
+	if _subtitle_lbl != null:
+		_subtitle_lbl.visible = not want_portrait

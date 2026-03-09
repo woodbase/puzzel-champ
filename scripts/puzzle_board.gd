@@ -21,8 +21,9 @@ const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 ## Confetti celebration effect played on puzzle completion.
 const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
-## Height in pixels of the top HUD bar.
-const HUD_H: float = 52.0
+## Height in pixels of the top HUD bar. Set dynamically in _ready() based on
+## orientation so that portrait / mobile gets a taller bar with larger touch targets.
+var HUD_H: float = 52.0
 
 ## Total number of puzzle pieces managed by this board.
 var _total_pieces: int = 0
@@ -83,6 +84,10 @@ const MIN_VOLUME_LINEAR: float = 0.0001
 
 
 func _ready() -> void:
+	# Use a taller HUD bar in portrait mode so touch targets are comfortably large.
+	if _is_portrait():
+		HUD_H = 64.0
+
 	_generator = PuzzleGeneratorScript.new()
 	_pickup_player = _create_pickup_audio_player()
 	add_child(_pickup_player)
@@ -137,6 +142,11 @@ func _draw() -> void:
 
 # ─── HUD construction ─────────────────────────────────────────────────────────
 
+## Returns true when the viewport is in portrait orientation (taller than wide).
+func _is_portrait() -> bool:
+	return get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
+
+
 func _build_hud() -> void:
 	# Semi-transparent top bar.
 	var top_bar := ColorRect.new()
@@ -187,9 +197,12 @@ func _make_hud_button(label_text: String) -> Button:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	btn.add_theme_font_size_override("font_size", 16)
+	var portrait := _is_portrait()
+	btn.add_theme_font_size_override("font_size", 18 if portrait else 16)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
+	var padding_v := 12 if portrait else 8
+	var padding_h := 16 if portrait else 12
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -200,10 +213,10 @@ func _make_hud_button(label_text: String) -> Button:
 		sb.corner_radius_top_right    = 6
 		sb.corner_radius_bottom_left  = 6
 		sb.corner_radius_bottom_right = 6
-		sb.content_margin_left   = 12
-		sb.content_margin_right  = 12
-		sb.content_margin_top    = 8
-		sb.content_margin_bottom = 8
+		sb.content_margin_left   = padding_h
+		sb.content_margin_right  = padding_h
+		sb.content_margin_top    = padding_v
+		sb.content_margin_bottom = padding_v
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
