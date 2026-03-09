@@ -60,8 +60,20 @@ var _snap_player: AudioStreamPlayer = null
 ## AudioStreamPlayer used to play the puzzle-completion fanfare.
 var _complete_player: AudioStreamPlayer = null
 
+## AudioStreamPlayer used to play the background music.
+var _music_player: AudioStreamPlayer = null
+
 ## The settings panel overlay (visibility toggled by the settings button).
 var _settings_panel: Control = null
+
+## Base volume_db values for each AudioStreamPlayer (before volume scaling).
+const PICKUP_BASE_DB: float = -10.0
+const SNAP_BASE_DB: float = -6.0
+const COMPLETE_BASE_DB: float = -3.0
+const MUSIC_BASE_DB: float = -18.0
+
+## Minimum linear volume passed to linear_to_db() to avoid log(0) errors.
+const MIN_VOLUME_LINEAR: float = 0.0001
 
 
 func _ready() -> void:
@@ -74,6 +86,7 @@ func _ready() -> void:
 	add_child(_complete_player)
 	_music_player = _create_music_player()
 	add_child(_music_player)
+	_apply_volume()
 
 	# GameState overrides the editor export vars when coming from the menu.
 	if GameState.image_texture != null:
@@ -212,7 +225,7 @@ func _build_settings_panel() -> void:
 	panel.offset_left   = -220
 	panel.offset_right  = 0
 	panel.offset_top    = HUD_H + 4
-	panel.offset_bottom = HUD_H + 4 + 200
+	panel.offset_bottom = HUD_H + 4 + 248
 	panel.visible = false
 	_hud.add_child(panel)
 
@@ -232,6 +245,8 @@ func _build_settings_panel() -> void:
 	title.add_theme_font_size_override("font_size", 14)
 	title.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
 	vbox.add_child(title)
+
+	vbox.add_child(_make_volume_slider())
 
 	vbox.add_child(_make_feedback_toggle(
 		"Background music",
@@ -274,10 +289,62 @@ func _make_feedback_toggle(label_text: String, initial_value: bool, callback: Ca
 	return cb
 
 
+## Creates a labelled HSlider row for the master volume setting.
+func _make_volume_slider() -> VBoxContainer:
+	var container := VBoxContainer.new()
+	container.add_theme_constant_override("separation", 2)
+
+	var header := HBoxContainer.new()
+	container.add_child(header)
+
+	var lbl := Label.new()
+	lbl.text = "Volume"
+	lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	lbl.add_theme_font_size_override("font_size", 13)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(lbl)
+
+	var pct_lbl := Label.new()
+	pct_lbl.text = "%d%%" % int(GameState.volume * 100.0)
+	pct_lbl.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
+	pct_lbl.add_theme_font_size_override("font_size", 13)
+	header.add_child(pct_lbl)
+
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 100.0
+	slider.step = 1.0
+	slider.value = GameState.volume * 100.0
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.value_changed.connect(func(v: float) -> void:
+		GameState.volume = v / 100.0
+		pct_lbl.text = "%d%%" % int(v)
+		_apply_volume()
+	)
+	container.add_child(slider)
+
+	return container
+
+
 ## Toggles the settings panel's visibility.
 func _toggle_settings_panel() -> void:
 	if _settings_panel != null:
 		_settings_panel.visible = not _settings_panel.visible
+
+
+## Applies the current GameState.volume to all AudioStreamPlayers.
+## Each player's volume_db is set to its base level offset by the linear-to-dB
+## conversion of the master volume so that 1.0 = full and 0.0 = silent.
+func _apply_volume() -> void:
+	var offset: float = linear_to_db(maxf(GameState.volume, MIN_VOLUME_LINEAR))
+	if _pickup_player != null:
+		_pickup_player.volume_db = PICKUP_BASE_DB + offset
+	if _snap_player != null:
+		_snap_player.volume_db = SNAP_BASE_DB + offset
+	if _complete_player != null:
+		_complete_player.volume_db = COMPLETE_BASE_DB + offset
+	if _music_player != null:
+		_music_player.volume_db = MUSIC_BASE_DB + offset
 
 
 func _build_complete_overlay() -> void:
@@ -501,7 +568,7 @@ func _show_complete() -> void:
 ## Creates and returns an AudioStreamPlayer loaded with a generated pickup sound.
 func _create_pickup_audio_player() -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.volume_db = -10.0
+	player.volume_db = PICKUP_BASE_DB
 	player.stream = _generate_pickup_sound()
 	return player
 
@@ -539,7 +606,7 @@ func _generate_pickup_sound() -> AudioStreamWAV:
 ## Creates and returns an AudioStreamPlayer loaded with a generated snap sound.
 func _create_snap_audio_player() -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.volume_db = -6.0
+	player.volume_db = SNAP_BASE_DB
 	player.stream = _generate_snap_sound()
 	return player
 
@@ -547,7 +614,7 @@ func _create_snap_audio_player() -> AudioStreamPlayer:
 ## Creates and returns an AudioStreamPlayer loaded with looping background music.
 func _create_music_player() -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.volume_db = -18.0
+	player.volume_db = MUSIC_BASE_DB
 	player.stream = _generate_music_stream()
 	return player
 
@@ -646,7 +713,7 @@ func _generate_snap_sound() -> AudioStreamWAV:
 ## Creates and returns an AudioStreamPlayer loaded with a generated completion fanfare.
 func _create_complete_audio_player() -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
-	player.volume_db = -3.0
+	player.volume_db = COMPLETE_BASE_DB
 	player.stream = _generate_completion_sound()
 	return player
 
