@@ -21,6 +21,9 @@ const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 ## Confetti celebration effect played on puzzle completion.
 const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
+## Prototype: puzzle border glow effect played on puzzle completion.
+const PuzzleGlowEffect = preload("res://scripts/puzzle_glow_effect.gd")
+
 ## Height in pixels of the top HUD bar. Set dynamically based on
 ## orientation and screen scale so that portrait / mobile gets a taller bar
 ## with comfortably large touch targets.
@@ -43,6 +46,9 @@ var _complete_overlay: Control = null
 
 ## Confetti particle effect shown on puzzle completion.
 var _confetti: Object = null
+
+## Prototype: pulsing border glow shown around the puzzle on completion.
+var _glow_effect: Object = null
 
 ## Guard flag: prevents overlapping rebuild calls.
 var _building: bool = false
@@ -496,6 +502,12 @@ func _build_complete_overlay() -> void:
 	_confetti = ConfettiEffect.new()
 	_hud.add_child(_confetti)
 
+	# Prototype: glow effect lives on the board's own coordinate space so it
+	# aligns with the puzzle grid.  Added to the board (not the HUD) so that
+	# draw_rect coordinates match piece local positions.
+	_glow_effect = PuzzleGlowEffect.new()
+	add_child(_glow_effect)
+
 
 ## Shows a message when no image is available (e.g. scene run from the editor).
 func _show_no_image_message() -> void:
@@ -645,6 +657,41 @@ func _show_complete() -> void:
 		_complete_player.play()
 	if GameState.feedback_visual and _confetti != null:
 		_confetti.start(get_viewport().get_visible_rect().size)
+	if GameState.feedback_visual and _glow_effect != null and _piece_size > 0:
+		var puzzle_rect := Rect2(Vector2.ZERO, Vector2(cols * _piece_size, rows * _piece_size))
+		_glow_effect.start(puzzle_rect)
+		_play_piece_celebration_wave()
+
+
+## Prototype: Piece Celebration Wave
+## Triggers a brief cascade of scale-bounce + gold-flash animations through all
+## locked pieces, staggered by their grid distance from the top-left corner.
+## Each piece bounces ~0.06 s after the piece diagonally before it, producing a
+## ripple that travels from the top-left to the bottom-right of the grid.
+func _play_piece_celebration_wave() -> void:
+	if _piece_size <= 0:
+		return
+	for child: Node in get_tree().get_nodes_in_group("puzzle_pieces"):
+		# All nodes in "puzzle_pieces" are PuzzlePiece Area2D instances; guard
+		# against unlocked pieces (not yet placed) using duck-typed property access.
+		if not child.get("is_locked"):
+			continue
+		var sprite := child.get_node_or_null("Sprite2D") as Sprite2D
+		if sprite == null:
+			continue
+		var correct_pos = child.get("correct_position")
+		if correct_pos == null:
+			continue
+		var col: int = int(correct_pos.x / float(_piece_size))
+		var row: int = int(correct_pos.y / float(_piece_size))
+		var delay: float = float(col + row) * 0.055
+		var tween := create_tween()
+		tween.tween_interval(delay)
+		tween.tween_property(sprite, "scale", Vector2(1.18, 1.18), 0.11)
+		tween.parallel().tween_property(sprite, "modulate", Color(1.5, 1.2, 0.3, 1.0), 0.11)
+		tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.20) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+		tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.20)
 
 
 ## Creates and returns an AudioStreamPlayer loaded with a generated pickup sound.
