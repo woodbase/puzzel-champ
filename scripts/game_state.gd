@@ -1,5 +1,12 @@
 extends Node
 
+## True when the game is running on a mobile device (Android or iOS).
+## Detected once at startup; read-only after _ready().
+var is_mobile: bool = false
+
+## Physical screen size in pixels as reported by the display server at startup.
+var screen_size: Vector2i = Vector2i.ZERO
+
 ## Path to the selected image file.
 ## For built-in gallery images this is the res:// resource path.
 ## For user-uploaded images this is the user:// path where the copy was saved.
@@ -38,3 +45,23 @@ var music_enabled: bool = true
 
 ## Master volume for all game audio (linear scale: 0.0 = silent, 1.0 = full).
 var volume: float = 1.0
+
+
+func _ready() -> void:
+	# ── Device-type detection ────────────────────────────────────────────────
+	# OS.has_feature("mobile") is Godot's canonical check for Android and iOS.
+	# It is evaluated before any scene loads, satisfying the startup-detection
+	# requirement and giving all other autoloads and scenes a stable value to
+	# read from GameState.is_mobile.
+	is_mobile = OS.has_feature("mobile")
+
+	# Record the physical screen size at startup so that layout code (e.g.
+	# UIScale, main_menu) can reference it without repeating the query.
+	screen_size = DisplayServer.screen_get_size()
+
+	# ── Difficulty defaults based on device type ─────────────────────────────
+	# On mobile, start with Easy (3×2) so pieces are large enough for touch.
+	# On desktop the existing Medium default (4×3) is already appropriate.
+	if is_mobile:
+		cols = 3
+		rows = 2
