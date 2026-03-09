@@ -23,6 +23,9 @@ const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
 ## Prototype: puzzle border glow effect played on puzzle completion.
 const PuzzleGlowEffect = preload("res://scripts/puzzle_glow_effect.gd")
+## Main menu script – used as the single source of difficulty presets so that
+## puzzle_board.gd stays in sync with main_menu.gd without duplicating data.
+const MainMenuScript = preload("res://scripts/main_menu.gd")
 
 ## Height in pixels of the top HUD bar. Set dynamically based on
 ## orientation and screen scale so that portrait / mobile gets a taller bar
@@ -79,6 +82,15 @@ var _music_player: AudioStreamPlayer = null
 
 ## The settings panel overlay (visibility toggled by the settings button).
 var _settings_panel: Control = null
+
+## Floating preview panel that shows the reference image in a corner.
+var _preview_panel: Control = null
+
+## Preview toggle button stored so its label can be updated.
+var _preview_toggle_btn: Button = null
+
+## Difficulty buttons inside the in-game menu panel.
+var _menu_diff_btns: Array[Button] = []
 
 ## ColorRect that forms the HUD top bar; stored to allow height updates on
 ## orientation / scale change.
@@ -193,14 +205,21 @@ func _build_hud() -> void:
 	_hud_hbox.add_child(back_btn)
 	_hud_buttons.append(back_btn)
 
-	var new_btn := _make_hud_button("New Puzzle")
-	new_btn.pressed.connect(_on_new_puzzle)
-	_hud_hbox.add_child(new_btn)
-	_hud_buttons.append(new_btn)
+	var restart_btn := _make_hud_button("Restart")
+	restart_btn.pressed.connect(_on_new_puzzle)
+	restart_btn.tooltip_text = "Restart this puzzle"
+	_hud_hbox.add_child(restart_btn)
+	_hud_buttons.append(restart_btn)
 
-	var settings_btn := _make_hud_button("⚙")
+	_preview_toggle_btn = _make_hud_button("Preview: Off")
+	_preview_toggle_btn.pressed.connect(_toggle_preview)
+	_preview_toggle_btn.tooltip_text = "Show / hide puzzle reference image"
+	_hud_hbox.add_child(_preview_toggle_btn)
+	_hud_buttons.append(_preview_toggle_btn)
+
+	var settings_btn := _make_hud_button("☰ Menu")
 	settings_btn.pressed.connect(_toggle_settings_panel)
-	settings_btn.tooltip_text = "Feedback settings"
+	settings_btn.tooltip_text = "Game menu"
 	_hud_hbox.add_child(settings_btn)
 	_hud_buttons.append(settings_btn)
 
@@ -218,6 +237,7 @@ func _build_hud() -> void:
 	_update_counter()
 	_build_settings_panel()
 	_build_complete_overlay()
+	_build_preview_panel()
 
 
 func _make_hud_button(label_text: String) -> Button:
@@ -281,10 +301,22 @@ func _on_layout_changed() -> void:
 	# Reposition the settings panel below the (possibly resized) HUD bar.
 	if _settings_panel != null:
 		_settings_panel.offset_top    = HUD_H + 4
-		_settings_panel.offset_bottom = HUD_H + 4 + 248
+		_settings_panel.offset_bottom = HUD_H + 4 + _settings_panel_height()
+
+	# Keep the preview panel in the bottom-right corner via anchor-based positioning.
+	# No manual repositioning is needed since _preview_panel uses anchor values of
+	# (1,1,1,1) which automatically track the viewport's bottom-right corner.
 
 
-## Builds a floating settings panel anchored below the HUD bar.
+## Returns the pixel height the settings/menu panel should have.
+func _settings_panel_height() -> int:
+	# 390 px accommodates difficulty row + settings toggles + divider on desktop.
+	return 390
+
+
+## Builds a floating game-menu panel anchored below the HUD bar.
+## The panel includes: difficulty selector, audio/visual settings toggles,
+## and a volume slider – serving as the game's in-play menu.
 func _build_settings_panel() -> void:
 	var panel := PanelContainer.new()
 	var ps := StyleBoxFlat.new()
@@ -303,10 +335,10 @@ func _build_settings_panel() -> void:
 	panel.anchor_right  = 1.0
 	panel.anchor_top    = 0.0
 	panel.anchor_bottom = 0.0
-	panel.offset_left   = -220
+	panel.offset_left   = -260
 	panel.offset_right  = 0
 	panel.offset_top    = HUD_H + 4
-	panel.offset_bottom = HUD_H + 4 + 248
+	panel.offset_bottom = HUD_H + 4 + _settings_panel_height()
 	panel.visible = false
 	_hud.add_child(panel)
 
@@ -321,11 +353,51 @@ func _build_settings_panel() -> void:
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
 
+	# ── Title ──
 	var title := Label.new()
-	title.text = "Settings"
-	title.add_theme_font_size_override("font_size", 14)
+	title.text = "Game Menu"
+	title.add_theme_font_size_override("font_size", 15)
 	title.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
 	vbox.add_child(title)
+
+	# ── Difficulty ──
+	var diff_sep := HSeparator.new()
+	diff_sep.add_theme_color_override("color", Color(0.35, 0.28, 0.50))
+	vbox.add_child(diff_sep)
+
+	var diff_lbl := Label.new()
+	diff_lbl.text = "Difficulty"
+	diff_lbl.add_theme_font_size_override("font_size", 13)
+	diff_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	vbox.add_child(diff_lbl)
+
+	var diff_row := HBoxContainer.new()
+	diff_row.add_theme_constant_override("separation", 4)
+	vbox.add_child(diff_row)
+
+	_menu_diff_btns.clear()
+	for i in range(MainMenuScript.DIFFICULTIES.size()):
+		var d: Dictionary = MainMenuScript.DIFFICULTIES[i]
+		var diff_btn := _make_menu_small_button(d["label"])
+		diff_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var di := i
+		diff_btn.pressed.connect(func() -> void: _apply_in_game_difficulty(di))
+		diff_row.add_child(diff_btn)
+		_menu_diff_btns.append(diff_btn)
+
+	# Highlight the currently active difficulty.
+	_refresh_menu_diff_highlight()
+
+	# ── Settings ──
+	var settings_sep := HSeparator.new()
+	settings_sep.add_theme_color_override("color", Color(0.35, 0.28, 0.50))
+	vbox.add_child(settings_sep)
+
+	var settings_lbl := Label.new()
+	settings_lbl.text = "Settings"
+	settings_lbl.add_theme_font_size_override("font_size", 13)
+	settings_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	vbox.add_child(settings_lbl)
 
 	vbox.add_child(_make_volume_slider())
 
@@ -411,6 +483,138 @@ func _make_volume_slider() -> VBoxContainer:
 func _toggle_settings_panel() -> void:
 	if _settings_panel != null:
 		_settings_panel.visible = not _settings_panel.visible
+
+
+## Applies a difficulty preset chosen inside the in-game menu.
+## Updates GameState, restarts the puzzle immediately.
+func _apply_in_game_difficulty(index: int) -> void:
+	if index < 0 or index >= MainMenuScript.DIFFICULTIES.size():
+		return
+	var d: Dictionary = MainMenuScript.DIFFICULTIES[index]
+	GameState.cols = d["cols"]
+	GameState.rows = d["rows"]
+	cols = GameState.cols
+	rows = GameState.rows
+	_refresh_menu_diff_highlight()
+	# Close the menu and restart the puzzle with the new difficulty.
+	if _settings_panel != null:
+		_settings_panel.visible = false
+	_on_new_puzzle()
+
+
+## Highlights the difficulty button matching the current GameState cols/rows.
+func _refresh_menu_diff_highlight() -> void:
+	for i in range(_menu_diff_btns.size()):
+		var btn := _menu_diff_btns[i]
+		var d: Dictionary = MainMenuScript.DIFFICULTIES[i]
+		var active := (d["cols"] == GameState.cols and d["rows"] == GameState.rows)
+		var sb_normal: StyleBoxFlat = btn.get_theme_stylebox("normal") as StyleBoxFlat
+		var sb_hover: StyleBoxFlat  = btn.get_theme_stylebox("hover")  as StyleBoxFlat
+		if sb_normal != null:
+			sb_normal.bg_color = Color(0.45, 0.28, 0.78) if active else Color(0.28, 0.18, 0.52)
+		if sb_hover != null:
+			sb_hover.bg_color = Color(0.55, 0.38, 0.88) if active else Color(0.38, 0.25, 0.65)
+
+
+## Builds the small-text button used inside the game menu (difficulty row).
+func _make_menu_small_button(label_text: String) -> Button:
+	var btn := Button.new()
+	btn.text = label_text
+	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	for state in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		match state:
+			"normal":  sb.bg_color = Color(0.28, 0.18, 0.52)
+			"hover":   sb.bg_color = Color(0.38, 0.25, 0.65)
+			"pressed": sb.bg_color = Color(0.20, 0.12, 0.40)
+		sb.corner_radius_top_left     = 5
+		sb.corner_radius_top_right    = 5
+		sb.corner_radius_bottom_left  = 5
+		sb.corner_radius_bottom_right = 5
+		sb.content_margin_left   = 6
+		sb.content_margin_right  = 6
+		sb.content_margin_top    = 4
+		sb.content_margin_bottom = 4
+		btn.add_theme_stylebox_override(state, sb)
+	return btn
+
+
+## Builds the optional floating preview panel anchored to the bottom-right corner.
+## The panel is hidden by default and toggled with the "Preview" HUD button.
+func _build_preview_panel() -> void:
+	var panel := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.10, 0.09, 0.18, 0.92)
+	ps.corner_radius_top_left     = 8
+	ps.corner_radius_top_right    = 8
+	ps.corner_radius_bottom_left  = 8
+	ps.corner_radius_bottom_right = 8
+	ps.border_width_left   = 1
+	ps.border_width_right  = 1
+	ps.border_width_top    = 1
+	ps.border_width_bottom = 1
+	ps.border_color = Color(0.45, 0.28, 0.78)
+	panel.add_theme_stylebox_override("panel", ps)
+
+	# Anchor to bottom-right corner.
+	const PREVIEW_W: float = 200.0
+	const PREVIEW_H: float = 150.0
+	const PREVIEW_MARGIN: float = 10.0
+	panel.anchor_left   = 1.0
+	panel.anchor_right  = 1.0
+	panel.anchor_top    = 1.0
+	panel.anchor_bottom = 1.0
+	panel.offset_left   = -(PREVIEW_W + PREVIEW_MARGIN)
+	panel.offset_right  = -PREVIEW_MARGIN
+	panel.offset_top    = -(PREVIEW_H + PREVIEW_MARGIN)
+	panel.offset_bottom = -PREVIEW_MARGIN
+	panel.visible = false
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud.add_child(panel)
+
+	var inner := MarginContainer.new()
+	inner.add_theme_constant_override("margin_left",   4)
+	inner.add_theme_constant_override("margin_right",  4)
+	inner.add_theme_constant_override("margin_top",    4)
+	inner.add_theme_constant_override("margin_bottom", 4)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(inner)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_child(vbox)
+
+	var hdr := Label.new()
+	hdr.text = "Reference"
+	hdr.add_theme_font_size_override("font_size", 11)
+	hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
+	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(hdr)
+
+	var tex_rect := TextureRect.new()
+	tex_rect.texture      = source_texture
+	tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tex_rect.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	tex_rect.custom_minimum_size   = Vector2(PREVIEW_W - 12.0, PREVIEW_H - 24.0)
+	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(tex_rect)
+
+	_preview_panel = panel
+
+
+## Toggles the optional preview image panel and updates the button label.
+func _toggle_preview() -> void:
+	if _preview_panel == null:
+		return
+	_preview_panel.visible = not _preview_panel.visible
+	if _preview_toggle_btn != null:
+		_preview_toggle_btn.text = "Preview: On" if _preview_panel.visible else "Preview: Off"
 
 
 ## Applies the current GameState.volume to all AudioStreamPlayers.
