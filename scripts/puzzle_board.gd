@@ -59,6 +59,14 @@ var _dragged_piece = null
 ## Pixel radius within which the target highlight is shown.
 const HIGHLIGHT_DISTANCE: float = 60.0
 
+## All puzzle pieces created during the last _build_puzzle() call.
+## Kept so the board entry animation can target each piece individually.
+var _pieces: Array = []
+
+## Full-screen dark overlay used for the puzzle-image fade-in animation.
+## Freed automatically once the fade-out completes.
+var _entry_overlay: ColorRect = null
+
 ## AudioStreamPlayer used to play the pickup sound effect.
 var _pickup_player: AudioStreamPlayer = null
 
@@ -94,6 +102,12 @@ const MUSIC_BASE_DB: float = -18.0
 
 ## Minimum linear volume passed to linear_to_db() to avoid log(0) errors.
 const MIN_VOLUME_LINEAR: float = 0.0001
+
+## Background colour of the board entry fade-in overlay.
+const ENTRY_OVERLAY_COLOR := Color(0.05, 0.05, 0.10, 1.0)
+
+## Time in seconds between each piece's scale-in animation during board entry.
+const PIECE_STAGGER_DELAY: float = 0.03
 
 
 func _ready() -> void:
@@ -566,6 +580,8 @@ func _build_puzzle() -> void:
 	if _piece_shape == "square":
 		shape_enum = PuzzleGeneratorScript.PieceShape.SQUARE
 
+	_pieces.clear()
+
 	for pd in piece_data_array:
 		var col: int = pd.grid_pos.x
 		var row: int = pd.grid_pos.y
@@ -604,6 +620,61 @@ func _build_puzzle() -> void:
 		piece.piece_placed.connect(on_piece_placed)
 		piece.piece_picked_up.connect(on_piece_picked_up.bind(piece))
 		piece.piece_released.connect(_on_piece_released)
+
+		_pieces.append(piece)
+
+	_animate_board_entry()
+
+
+## Plays the board entry animation after each puzzle build.
+##
+## Two loading-animation prototypes run simultaneously:
+##
+##   Prototype A – Puzzle image fade-in
+##     A full-screen dark overlay is placed on top of the freshly-built board
+##     and fades to transparent over ~0.55 s, creating the impression of the
+##     scattered pieces being gradually revealed from darkness.
+##
+##   Prototype B – Puzzle pieces assembling
+##     Each piece starts at scale Vector2.ZERO and springs open to its normal
+##     size using an elastic ease with a 30 ms stagger between pieces.  The
+##     stagger makes the board feel like it's populating piece-by-piece rather
+##     than appearing all at once.
+func _animate_board_entry() -> void:
+	if _pieces.is_empty():
+		return
+
+	# ── Prototype A: Puzzle image fade-in ──────────────────────────────────────
+	# Clean up any leftover overlay from a previous build before adding a new
+	# one (can happen when "New Puzzle" is pressed during the animation).
+	if is_instance_valid(_entry_overlay):
+		_entry_overlay.queue_free()
+
+	_entry_overlay = ColorRect.new()
+	_entry_overlay.color = ENTRY_OVERLAY_COLOR
+	_entry_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_hud.add_child(_entry_overlay)
+
+	var overlay_tween := create_tween()
+	overlay_tween.tween_property(_entry_overlay, "modulate:a", 0.0, 0.55) \
+		.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+	overlay_tween.tween_callback(func() -> void:
+		if is_instance_valid(_entry_overlay):
+			_entry_overlay.queue_free()
+			_entry_overlay = null
+	)
+
+	# ── Prototype B: Puzzle pieces assembling ──────────────────────────────────
+	for i in _pieces.size():
+		var piece = _pieces[i]
+		if not is_instance_valid(piece):
+			continue
+		piece.scale = Vector2.ZERO
+		var delay: float = i * PIECE_STAGGER_DELAY
+		var piece_tween := piece.create_tween()
+		piece_tween.tween_interval(delay)
+		piece_tween.tween_property(piece, "scale", Vector2.ONE, 0.40) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -863,8 +934,14 @@ func _on_new_puzzle() -> void:
 	if _complete_player != null:
 		_complete_player.stop()
 
+	# Dismiss any in-progress entry overlay immediately.
+	if is_instance_valid(_entry_overlay):
+		_entry_overlay.queue_free()
+		_entry_overlay = null
+
 	for piece in get_tree().get_nodes_in_group("puzzle_pieces"):
 		piece.queue_free()
+	_pieces.clear()
 
 	_placed_pieces = 0
 	_total_pieces  = 0
