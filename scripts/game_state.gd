@@ -35,3 +35,6 @@ var feedback_haptic: bool = true
 
 ## Whether background music is enabled during gameplay.
 var music_enabled: bool = true
+
+## Master volume for all game audio (linear scale: 0.0 = silent, 1.0 = full).
+var volume: float = 1.0
