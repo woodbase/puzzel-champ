@@ -42,6 +42,15 @@ var _building: bool = false
 ## Currently selected piece shape key (mirrors GameState.piece_shape).
 var _piece_shape: String = "jigsaw"
 
+## Pixel size of each puzzle piece (set during _build_puzzle).
+var _piece_size: int = 0
+
+## The piece currently being dragged, or null when nothing is held.
+var _dragged_piece = null
+
+## Pixel radius within which the target highlight is shown.
+const HIGHLIGHT_DISTANCE: float = 60.0
+
 ## AudioStreamPlayer used to play the pickup sound effect.
 var _pickup_player: AudioStreamPlayer = null
 
@@ -82,6 +91,29 @@ func _ready() -> void:
 
 	if GameState.music_enabled:
 		_music_player.play()
+
+
+func _process(_delta: float) -> void:
+	if _dragged_piece != null and GameState.feedback_visual:
+		queue_redraw()
+
+
+## Draws a highlight rectangle at the target position of the dragged piece when
+## it is within HIGHLIGHT_DISTANCE of that target.
+func _draw() -> void:
+	if _dragged_piece == null or not GameState.feedback_visual or _piece_size <= 0:
+		return
+	var target_local: Vector2 = _dragged_piece.correct_position
+	var target_global: Vector2 = to_global(target_local)
+	var dist: float = _dragged_piece.global_position.distance_to(target_global)
+	if dist >= HIGHLIGHT_DISTANCE:
+		return
+	# Alpha increases as the piece approaches the target (0 at edge → 1 at centre).
+	var alpha: float = 1.0 - (dist / HIGHLIGHT_DISTANCE)
+	var half: float = _piece_size * 0.5
+	var rect := Rect2(target_local - Vector2(half, half), Vector2(_piece_size, _piece_size))
+	draw_rect(rect, Color(0.2, 0.85, 0.2, alpha * 0.25), true)
+	draw_rect(rect, Color(0.2, 0.95, 0.2, alpha * 0.80), false)
 
 
 # ─── HUD construction ─────────────────────────────────────────────────────────
@@ -374,6 +406,7 @@ func _build_puzzle() -> void:
 
 	# Calculate piece size (square pieces using the smaller cell dimension).
 	var piece_size: int = min(img_w / cols, img_h / rows)
+	_piece_size = piece_size
 
 	var piece_data_array: Array = _generator.generate_edges(cols, rows)
 	_total_pieces  = piece_data_array.size()
@@ -423,7 +456,8 @@ func _build_puzzle() -> void:
 			randf_range(HUD_H + half, viewport_size.y - half)
 		)
 		piece.piece_placed.connect(on_piece_placed)
-		piece.piece_picked_up.connect(on_piece_picked_up)
+		piece.piece_picked_up.connect(on_piece_picked_up.bind(piece))
+		piece.piece_released.connect(_on_piece_released)
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -444,9 +478,16 @@ func on_piece_placed() -> void:
 
 
 ## Called by each PuzzlePiece when the player picks it up.
-func on_piece_picked_up() -> void:
+func on_piece_picked_up(piece) -> void:
+	_dragged_piece = piece
 	if GameState.feedback_audio and _pickup_player != null:
 		_pickup_player.play()
+
+
+## Called by each PuzzlePiece when the player releases it (placed or dropped).
+func _on_piece_released() -> void:
+	_dragged_piece = null
+	queue_redraw()
 
 
 ## Displays the completion overlay and plays the completion fanfare.
