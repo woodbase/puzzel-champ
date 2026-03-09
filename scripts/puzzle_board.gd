@@ -21,6 +21,10 @@ const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 ## Confetti celebration effect played on puzzle completion.
 const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
+## Main menu script – used as the single source of difficulty presets so that
+## puzzle_board.gd stays in sync with main_menu.gd without duplicating data.
+const MainMenuScript = preload("res://scripts/main_menu.gd")
+
 ## Height in pixels of the top HUD bar. Set dynamically based on
 ## orientation and screen scale so that portrait / mobile gets a taller bar
 ## with comfortably large touch targets.
@@ -82,14 +86,6 @@ var _preview_toggle_btn: Button = null
 
 ## Difficulty buttons inside the in-game menu panel.
 var _menu_diff_btns: Array[Button] = []
-
-## Difficulty presets mirrored from the main menu for the in-game selector.
-const DIFFICULTIES: Array[Dictionary] = [
-	{"label": "Easy",   "cols": 3, "rows": 2},
-	{"label": "Medium", "cols": 4, "rows": 3},
-	{"label": "Hard",   "cols": 6, "rows": 4},
-	{"label": "Expert", "cols": 8, "rows": 6},
-]
 
 ## ColorRect that forms the HUD top bar; stored to allow height updates on
 ## orientation / scale change.
@@ -375,8 +371,8 @@ func _build_settings_panel() -> void:
 	vbox.add_child(diff_row)
 
 	_menu_diff_btns.clear()
-	for i in range(DIFFICULTIES.size()):
-		var d: Dictionary = DIFFICULTIES[i]
+	for i in range(MainMenuScript.DIFFICULTIES.size()):
+		var d: Dictionary = MainMenuScript.DIFFICULTIES[i]
 		var diff_btn := _make_menu_small_button(d["label"])
 		diff_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var di := i
@@ -487,9 +483,9 @@ func _toggle_settings_panel() -> void:
 ## Applies a difficulty preset chosen inside the in-game menu.
 ## Updates GameState, restarts the puzzle immediately.
 func _apply_in_game_difficulty(index: int) -> void:
-	if index < 0 or index >= DIFFICULTIES.size():
+	if index < 0 or index >= MainMenuScript.DIFFICULTIES.size():
 		return
-	var d: Dictionary = DIFFICULTIES[index]
+	var d: Dictionary = MainMenuScript.DIFFICULTIES[index]
 	GameState.cols = d["cols"]
 	GameState.rows = d["rows"]
 	cols = GameState.cols
@@ -505,7 +501,7 @@ func _apply_in_game_difficulty(index: int) -> void:
 func _refresh_menu_diff_highlight() -> void:
 	for i in range(_menu_diff_btns.size()):
 		var btn := _menu_diff_btns[i]
-		var d: Dictionary = DIFFICULTIES[i]
+		var d: Dictionary = MainMenuScript.DIFFICULTIES[i]
 		var active := (d["cols"] == GameState.cols and d["rows"] == GameState.rows)
 		var sb_normal: StyleBoxFlat = btn.get_theme_stylebox("normal") as StyleBoxFlat
 		var sb_hover: StyleBoxFlat  = btn.get_theme_stylebox("hover")  as StyleBoxFlat
@@ -570,6 +566,7 @@ func _build_preview_panel() -> void:
 	panel.offset_top    = -(PREVIEW_H + PREVIEW_MARGIN)
 	panel.offset_bottom = -PREVIEW_MARGIN
 	panel.visible = false
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.add_child(panel)
 
 	var inner := MarginContainer.new()
@@ -577,10 +574,12 @@ func _build_preview_panel() -> void:
 	inner.add_theme_constant_override("margin_right",  4)
 	inner.add_theme_constant_override("margin_top",    4)
 	inner.add_theme_constant_override("margin_bottom", 4)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(inner)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inner.add_child(vbox)
 
 	var hdr := Label.new()
@@ -588,6 +587,7 @@ func _build_preview_panel() -> void:
 	hdr.add_theme_font_size_override("font_size", 11)
 	hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
 	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(hdr)
 
 	var tex_rect := TextureRect.new()
@@ -597,6 +597,7 @@ func _build_preview_panel() -> void:
 	tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tex_rect.size_flags_vertical   = Control.SIZE_EXPAND_FILL
 	tex_rect.custom_minimum_size   = Vector2(PREVIEW_W - 12.0, PREVIEW_H - 24.0)
+	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(tex_rect)
 
 	_preview_panel = panel
