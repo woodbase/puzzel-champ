@@ -21,8 +21,9 @@ const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 ## Confetti celebration effect played on puzzle completion.
 const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
-## Height in pixels of the top HUD bar. Set dynamically in _ready() based on
-## orientation so that portrait / mobile gets a taller bar with larger touch targets.
+## Height in pixels of the top HUD bar. Set dynamically based on
+## orientation and screen scale so that portrait / mobile gets a taller bar
+## with comfortably large touch targets.
 var HUD_H: float = 52.0
 
 ## Total number of puzzle pieces managed by this board.
@@ -73,6 +74,18 @@ var _music_player: AudioStreamPlayer = null
 ## The settings panel overlay (visibility toggled by the settings button).
 var _settings_panel: Control = null
 
+## ColorRect that forms the HUD top bar; stored to allow height updates on
+## orientation / scale change.
+var _hud_top_bar: ColorRect = null
+
+## HBoxContainer that holds the HUD buttons and counter; stored to allow
+## height and layout updates on orientation / scale change.
+var _hud_hbox: HBoxContainer = null
+
+## All buttons created inside the HUD bar, stored so their styles can be
+## refreshed when the layout changes.
+var _hud_buttons: Array[Button] = []
+
 ## Base volume_db values for each AudioStreamPlayer (before volume scaling).
 const PICKUP_BASE_DB: float = -10.0
 const SNAP_BASE_DB: float = -6.0
@@ -84,9 +97,8 @@ const MIN_VOLUME_LINEAR: float = 0.0001
 
 
 func _ready() -> void:
-	# Use a taller HUD bar in portrait mode so touch targets are comfortably large.
-	if _is_portrait():
-		HUD_H = 64.0
+	# Set HUD bar height based on orientation and screen scale.
+	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
 
 	_generator = PuzzleGeneratorScript.new()
 	_pickup_player = _create_pickup_audio_player()
@@ -98,6 +110,9 @@ func _ready() -> void:
 	_music_player = _create_music_player()
 	add_child(_music_player)
 	_apply_volume()
+
+	# Keep HUD in sync when the window is resized or the device rotates.
+	UIScale.layout_changed.connect(_on_layout_changed)
 
 	# GameState overrides the editor export vars when coming from the menu.
 	if GameState.image_texture != null:
@@ -143,50 +158,56 @@ func _draw() -> void:
 # ─── HUD construction ─────────────────────────────────────────────────────────
 
 ## Returns true when the viewport is in portrait orientation (taller than wide).
+## Delegates to UIScale so there is a single source of truth.
 func _is_portrait() -> bool:
-	return get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x
+	return UIScale.is_portrait()
 
 
 func _build_hud() -> void:
-	# Semi-transparent top bar.
-	var top_bar := ColorRect.new()
-	top_bar.color = Color(0.10, 0.12, 0.17, 0.92)
-	top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top_bar.offset_bottom = HUD_H
-	_hud.add_child(top_bar)
+	# Semi-transparent top bar – reference stored for layout updates.
+	_hud_top_bar = ColorRect.new()
+	_hud_top_bar.color = Color(0.10, 0.12, 0.17, 0.92)
+	_hud_top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_hud_top_bar.offset_bottom = HUD_H
+	_hud.add_child(_hud_top_bar)
 
-	# Button / counter row.
-	var hbox := HBoxContainer.new()
-	hbox.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	hbox.offset_left   = 12
-	hbox.offset_right  = -12
-	hbox.offset_bottom = HUD_H
-	hbox.add_theme_constant_override("separation", 8)
-	_hud.add_child(hbox)
+	# Button / counter row – reference stored for layout updates.
+	_hud_hbox = HBoxContainer.new()
+	_hud_hbox.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_hud_hbox.offset_left   = 12
+	_hud_hbox.offset_right  = -12
+	_hud_hbox.offset_bottom = HUD_H
+	_hud_hbox.add_theme_constant_override("separation", 8)
+	_hud.add_child(_hud_hbox)
+
+	_hud_buttons.clear()
 
 	var back_btn := _make_hud_button("Menu")
 	back_btn.pressed.connect(_on_back_pressed)
-	hbox.add_child(back_btn)
+	_hud_hbox.add_child(back_btn)
+	_hud_buttons.append(back_btn)
 
 	var new_btn := _make_hud_button("New Puzzle")
 	new_btn.pressed.connect(_on_new_puzzle)
-	hbox.add_child(new_btn)
+	_hud_hbox.add_child(new_btn)
+	_hud_buttons.append(new_btn)
 
 	var settings_btn := _make_hud_button("⚙")
 	settings_btn.pressed.connect(_toggle_settings_panel)
 	settings_btn.tooltip_text = "Feedback settings"
-	hbox.add_child(settings_btn)
+	_hud_hbox.add_child(settings_btn)
+	_hud_buttons.append(settings_btn)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(spacer)
+	_hud_hbox.add_child(spacer)
 
 	_counter_label = Label.new()
-	_counter_label.add_theme_font_size_override("font_size", 18)
+	_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
 	_counter_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	_counter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_counter_label.custom_minimum_size = Vector2(0, HUD_H)
-	hbox.add_child(_counter_label)
+	_hud_hbox.add_child(_counter_label)
 
 	_update_counter()
 	_build_settings_panel()
@@ -197,12 +218,12 @@ func _make_hud_button(label_text: String) -> Button:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	var portrait := _is_portrait()
-	btn.add_theme_font_size_override("font_size", 18 if portrait else 16)
+	var portrait := UIScale.is_portrait()
+	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
-	var padding_v := 12 if portrait else 8
-	var padding_h := 16 if portrait else 12
+	var padding_v := UIScale.px(12.0 if portrait else 8.0)
+	var padding_h := UIScale.px(16.0 if portrait else 12.0)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -220,6 +241,41 @@ func _make_hud_button(label_text: String) -> Button:
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
+
+
+## Updates the HUD bar height and button styles to match the current layout.
+## Called when UIScale emits layout_changed (orientation flip or window resize).
+func _on_layout_changed() -> void:
+	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+
+	if _hud_top_bar != null:
+		_hud_top_bar.offset_bottom = HUD_H
+
+	if _hud_hbox != null:
+		_hud_hbox.offset_bottom = HUD_H
+
+	if _counter_label != null:
+		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
+		_counter_label.custom_minimum_size = Vector2(0, HUD_H)
+
+	var portrait := UIScale.is_portrait()
+	var padding_v := UIScale.px(12.0 if portrait else 8.0)
+	var padding_h := UIScale.px(16.0 if portrait else 12.0)
+	for btn in _hud_buttons:
+		btn.add_theme_font_size_override(
+			"font_size", UIScale.font_size(18 if portrait else 16))
+		for state in ["normal", "hover", "pressed"]:
+			var sb: StyleBoxFlat = btn.get_theme_stylebox(state) as StyleBoxFlat
+			if sb != null:
+				sb.content_margin_left   = padding_h
+				sb.content_margin_right  = padding_h
+				sb.content_margin_top    = padding_v
+				sb.content_margin_bottom = padding_v
+
+	# Reposition the settings panel below the (possibly resized) HUD bar.
+	if _settings_panel != null:
+		_settings_panel.offset_top    = HUD_H + 4
+		_settings_panel.offset_bottom = HUD_H + 4 + 248
 
 
 ## Builds a floating settings panel anchored below the HUD bar.
