@@ -28,7 +28,7 @@ const DRAG_Z_INDEX: int = 10
 const SNAP_DISTANCE: float = 20.0
 
 ## Golden colour used for the lock-particle burst.
-const PARTICLE_COLOR := Color(1.0, 0.9, 0.3)
+const PARTICLE_COLOR: Color = Color(1.0, 0.9, 0.3)
 
 
 func _ready() -> void:
