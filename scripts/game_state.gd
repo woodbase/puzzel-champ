@@ -46,6 +46,10 @@ var music_enabled: bool = true
 ## Master volume for all game audio (linear scale: 0.0 = silent, 1.0 = full).
 var volume: float = 1.0
 
+## True once the player has explicitly started a game (difficulty has been
+## committed at least once). Used by the main menu to decide whether to
+## auto-select a screen-size-appropriate difficulty on first load.
+var difficulty_explicitly_set: bool = false
 
 func _ready() -> void:
 	# ── Device-type detection ────────────────────────────────────────────────

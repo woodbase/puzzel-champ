@@ -92,6 +92,12 @@ func _ready() -> void:
 	else:
 		_select_gallery_item(0)
 
+	# On first load (no game started yet) auto-select a sensible default
+	# based on screen size; otherwise restore the player's last choice.
+	if GameState.difficulty_explicitly_set:
+		_apply_difficulty(_find_difficulty_index(GameState.cols, GameState.rows))
+	else:
+		_apply_difficulty(_default_difficulty_for_screen())
 	if GameState.image_texture == null and UIScale.is_mobile():
 		# Fresh start on a mobile device: default to Easy for comfortable play.
 		_apply_difficulty(0)
@@ -595,6 +601,13 @@ func _find_difficulty_index(c: int, r: int) -> int:
 	return 1  # default: Medium
 
 
+## Returns the most appropriate default difficulty index for the current screen.
+## Mobile / small-screen devices get Easy (fewest pieces, easiest to tap);
+## desktops and tablets in landscape get Hard (more pieces, better use of space).
+func _default_difficulty_for_screen() -> int:
+	return 0 if UIScale.is_mobile() else 2  # Easy for mobile, Hard for desktop
+
+
 func _apply_shape(index: int) -> void:
 	_shape_index = index
 
@@ -667,6 +680,7 @@ func _on_start_pressed() -> void:
 		_show_error("Please select an image first.")
 		return
 	var d := DIFFICULTIES[_difficulty_index]
+	GameState.difficulty_explicitly_set = true
 	GameState.image_texture = _selected_texture
 	GameState.image_path    = _selected_path
 	GameState.gallery_index = _active_gallery_idx
