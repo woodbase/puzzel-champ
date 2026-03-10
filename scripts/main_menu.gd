@@ -208,7 +208,7 @@ func _unique_user_gallery_path(base_name: String, ext: String) -> String:
 ## Saves *img* to *dest_path* using the requested extension. Returns false on failure.
 func _save_image_with_extension(img: Image, dest_path: String, ext: String) -> bool:
 	var abs_dest := ProjectSettings.globalize_path(dest_path)
-	var err: int = ERR_FILE_UNAVAILABLE
+	var err: int = FAILED
 	match ext:
 		"png":
 			err = img.save_png(abs_dest)
