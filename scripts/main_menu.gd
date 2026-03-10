@@ -45,6 +45,12 @@ const THUMBNAIL_SIZE := 96
 ## easier touch targeting.
 const THUMBNAIL_SIZE_PORTRAIT := 120
 
+## Maximum pixel dimension (width or height) for full-resolution textures kept
+## in memory.  Images larger than this are downscaled before being uploaded to
+## the GPU, reducing memory usage while retaining enough detail for all
+## realistic screen sizes and difficulty settings.
+const MAX_FULL_RES_DIMENSION: int = 2048
+
 # ─── State ────────────────────────────────────────────────────────────────────
 var _selected_texture: Texture2D = null
 var _selected_path: String       = ""
@@ -198,6 +204,18 @@ func _make_thumbnail(img: Image) -> ImageTexture:
 	var copy := img.duplicate() as Image
 	copy.resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, Image.INTERPOLATE_BILINEAR)
 	return ImageTexture.create_from_image(copy)
+
+
+## Resizes *img* in-place so that neither dimension exceeds MAX_FULL_RES_DIMENSION,
+## preserving the aspect ratio.  Has no effect when the image is already within bounds.
+## Using INTERPOLATE_LANCZOS gives high-quality downscaling with minimal aliasing.
+func _limit_image_size(img: Image) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	if w <= MAX_FULL_RES_DIMENSION and h <= MAX_FULL_RES_DIMENSION:
+		return
+	var scale: float = float(MAX_FULL_RES_DIMENSION) / float(max(w, h))
+	img.resize(int(w * scale), int(h * scale), Image.INTERPOLATE_LANCZOS)
 
 # ─── UI construction ─────────────────────────────────────────────────────────
 
@@ -545,6 +563,7 @@ func _select_gallery_item(index: int) -> void:
 	if _gallery_textures[index] == null and _gallery_paths[index] != "":
 		var img := Image.load_from_file(_gallery_paths[index])
 		if img != null:
+			_limit_image_size(img)
 			_gallery_textures[index] = ImageTexture.create_from_image(img)
 	var path := _gallery_paths[index] if index < _gallery_paths.size() else ""
 	_apply_selection(_gallery_textures[index], path, index)
@@ -668,6 +687,7 @@ func _on_file_selected(path: String) -> void:
 	var saved_path := _save_user_image(path)
 	var use_path := saved_path if saved_path != "" else path
 
+	_limit_image_size(img)
 	var tex := ImageTexture.create_from_image(img)
 	_gallery_textures.append(tex)
 	_gallery_thumb_textures.append(_make_thumbnail(img))
