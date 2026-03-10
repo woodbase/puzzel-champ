@@ -137,6 +137,30 @@ var _hud_buttons: Array[Button] = []
 ## always fit the newly-rotated screen.
 var _last_portrait: bool = false
 
+## Camera2D that controls the puzzle workspace zoom and pan.
+var _camera: Camera2D = null
+
+## Current zoom level (1.0 = default, >1 = zoomed in, <1 = zoomed out).
+var _zoom_level: float = 1.0
+
+## Minimum zoom level – the workspace can be shrunk to half its default size.
+const ZOOM_MIN: float = 0.5
+
+## Maximum zoom level – the workspace can be enlarged to four times its default size.
+const ZOOM_MAX: float = 4.0
+
+## Multiplicative step applied per mouse-wheel tick (≈ 15 % per tick).
+const ZOOM_STEP: float = 1.15
+
+## True while the workspace is being panned via middle-mouse drag.
+var _panning: bool = false
+
+## Mouse screen position recorded when the current pan gesture started.
+var _pan_start_mouse: Vector2 = Vector2.ZERO
+
+## Camera world position recorded when the current pan gesture started.
+var _pan_start_cam: Vector2 = Vector2.ZERO
+
 ## Base volume_db values for each AudioStreamPlayer (before volume scaling).
 const PICKUP_BASE_DB: float = -10.0
 const SNAP_BASE_DB: float = -6.0
@@ -177,6 +201,10 @@ func _ready() -> void:
 	_music_player = _create_music_player()
 	add_child(_music_player)
 	_apply_volume()
+
+	# Camera2D for workspace zoom and pan.
+	_camera = Camera2D.new()
+	add_child(_camera)
 
 	# Keep HUD in sync when the window is resized or the device rotates.
 	UIScale.layout_changed.connect(_on_layout_changed)
@@ -379,6 +407,87 @@ func _settings_panel_height() -> int:
 	var vp_h := int(get_viewport().get_visible_rect().size.y)
 	# 390 px is the natural content height; cap to fit on small screens.
 	return mini(390, vp_h - int(HUD_H) - 8)
+
+
+# ─── Workspace zoom and pan ───────────────────────────────────────────────────
+
+## Resets the workspace camera to the default 1:1 zoom centred on the viewport.
+## Also clears any in-progress pan gesture.
+func _reset_camera() -> void:
+	if _camera == null:
+		return
+	_zoom_level = 1.0
+	_panning = false
+	_camera.zoom = Vector2.ONE
+	_camera.position = get_viewport_rect().size * 0.5
+
+
+## Zooms the workspace by zoom_factor, keeping the world point under
+## screen_pos visually fixed (zoom-to-cursor behaviour).
+## zoom_factor > 1 zooms in; zoom_factor < 1 zooms out.
+func _zoom_at_point(zoom_factor: float, screen_pos: Vector2) -> void:
+	if _camera == null:
+		return
+	var old_zoom := _zoom_level
+	_zoom_level = clampf(_zoom_level * zoom_factor, ZOOM_MIN, ZOOM_MAX)
+	if _zoom_level == old_zoom:
+		return  # Already at the limit; nothing to do.
+	var vp_center := get_viewport_rect().size * 0.5
+	# Shift the camera so the world point under screen_pos stays fixed.
+	# Derivation: world_pt = (screen_pos - vp_center) / zoom + cam_pos (same before and after).
+	_camera.position += (screen_pos - vp_center) * (1.0 / old_zoom - 1.0 / _zoom_level)
+	_camera.zoom = Vector2(_zoom_level, _zoom_level)
+
+
+## Handles workspace zoom and pan input.
+## Piece-drag events (left mouse button) are consumed by each PuzzlePiece before
+## reaching _unhandled_input, so zoom and pan never interfere with piece dragging.
+##
+## Controls:
+##   Mouse wheel up/down  – zoom in / out toward the cursor
+##   Middle-mouse drag    – pan the workspace (grab-and-drag)
+##   Pinch gesture        – zoom in / out (trackpad and touch screen)
+##   Two-finger pan       – pan the workspace (trackpad and touch screen)
+func _unhandled_input(event: InputEvent) -> void:
+	if _camera == null:
+		return
+
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			match mb.button_index:
+				MOUSE_BUTTON_WHEEL_UP:
+					_zoom_at_point(ZOOM_STEP, mb.position)
+					get_viewport().set_input_as_handled()
+				MOUSE_BUTTON_WHEEL_DOWN:
+					_zoom_at_point(1.0 / ZOOM_STEP, mb.position)
+					get_viewport().set_input_as_handled()
+				MOUSE_BUTTON_MIDDLE:
+					_panning = true
+					_pan_start_mouse = mb.position
+					_pan_start_cam   = _camera.position
+					get_viewport().set_input_as_handled()
+		elif not mb.pressed and mb.button_index == MOUSE_BUTTON_MIDDLE:
+			_panning = false
+			get_viewport().set_input_as_handled()
+
+	elif event is InputEventMouseMotion and _panning:
+		var mm := event as InputEventMouseMotion
+		# Divide by zoom so the pan speed matches the visual size of objects.
+		_camera.position = _pan_start_cam - (mm.position - _pan_start_mouse) / _zoom_level
+		get_viewport().set_input_as_handled()
+
+	elif event is InputEventMagnifyGesture:
+		# Pinch-to-zoom on touch screens and trackpads.
+		var mg := event as InputEventMagnifyGesture
+		_zoom_at_point(mg.factor, mg.position)
+		get_viewport().set_input_as_handled()
+
+	elif event is InputEventPanGesture:
+		# Two-finger scroll/swipe on trackpads and touch screens.
+		var pg := event as InputEventPanGesture
+		_camera.position += pg.delta / _zoom_level
+		get_viewport().set_input_as_handled()
 
 
 ## Builds a floating game-menu panel anchored below the HUD bar.
@@ -941,6 +1050,9 @@ func _build_puzzle() -> void:
 		push_error("PuzzleBoard: cols and rows must each be at least 1 (got cols=%d, rows=%d)." % [cols, rows])
 		return
 
+	# Reset the workspace camera so every new puzzle starts at the default 1:1 view.
+	_reset_camera()
+
 	var viewport_size := get_viewport_rect().size
 
 	# Scale the puzzle to fill 90 % of the available area below the HUD bar.
@@ -1432,6 +1544,8 @@ func _on_back_pressed() -> void:
 func _on_restart_puzzle() -> void:
 	if _building:
 		return
+
+	_reset_camera()
 
 	if _complete_overlay != null:
 		_complete_overlay.visible = false
