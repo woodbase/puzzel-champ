@@ -157,6 +157,9 @@ const REFERENCE_PANEL_W: float = 160.0
 const REFERENCE_PANEL_H: float = 120.0
 ## Gap between the reference panel and the screen / HUD edges.
 const REFERENCE_PANEL_MARGIN: float = 8.0
+## Source image pieces are downscaled to at most 1.35 × the on-screen piece size
+## so GPU memory / bandwidth stay reasonable on mobile while keeping detail.
+const SOURCE_OVERSAMPLE: float = 1.35
 
 
 func _ready() -> void:
@@ -938,6 +941,18 @@ func _build_puzzle() -> void:
 		push_error("PuzzleBoard: cols and rows must each be at least 1 (got cols=%d, rows=%d)." % [cols, rows])
 		return
 
+	var viewport_size := get_viewport_rect().size
+
+	# Scale the puzzle to fill 90 % of the available area below the HUD bar.
+	# Use the largest square cell size that lets all columns and rows fit.
+	var avail_w: float = viewport_size.x * 0.90
+	var avail_h: float = (viewport_size.y - HUD_H) * 0.90
+	var screen_piece_size: float = minf(avail_w / float(cols), avail_h / float(rows))
+	if screen_piece_size <= 0.0:
+		push_error("PuzzleBoard: screen_piece_size must be positive (got %.2f)." % screen_piece_size)
+		return
+	_piece_size = int(screen_piece_size)
+
 	var image := source_texture.get_image()
 	if image == null:
 		return
@@ -949,6 +964,15 @@ func _build_puzzle() -> void:
 
 	# Base piece size in image-space (square cells, uses the smaller dimension).
 	var image_piece_size: int = min(img_w / cols, img_h / rows)
+	if image_piece_size <= 0:
+		push_error("PuzzleBoard: source image too small for grid (piece size <= 0).")
+		return
+
+	# Cap source resolution so per-piece textures stay close to on-screen size,
+	# reducing GPU bandwidth/memory on mobile while keeping a modest oversample.
+	var max_source_piece: int = int(ceil(screen_piece_size * SOURCE_OVERSAMPLE))
+	if max_source_piece > 0:
+		image_piece_size = min(image_piece_size, max_source_piece)
 
 	# Resize the image to be exactly cols × image_piece_size wide and
 	# rows × image_piece_size tall so that integer-division truncation cannot
@@ -957,15 +981,6 @@ func _build_puzzle() -> void:
 	var target_img_h: int = rows * image_piece_size
 	if image.get_width() != target_img_w or image.get_height() != target_img_h:
 		image.resize(target_img_w, target_img_h, Image.INTERPOLATE_LANCZOS)
-
-	var viewport_size := get_viewport_rect().size
-
-	# Scale the puzzle to fill 90 % of the available area below the HUD bar.
-	# Use the largest square cell size that lets all columns and rows fit.
-	var avail_w: float = viewport_size.x * 0.90
-	var avail_h: float = (viewport_size.y - HUD_H) * 0.90
-	var screen_piece_size: float = minf(avail_w / float(cols), avail_h / float(rows))
-	_piece_size = int(screen_piece_size)
 
 	# Centre the puzzle grid on the available canvas area.
 	var puzzle_w: float = screen_piece_size * float(cols)
