@@ -16,7 +16,7 @@ config/name="Puzzle Champ"
 config/description="A puzzle game with your own images"
 run/main_scene="res://scenes/splash/splash.tscn"
 config/features=PackedStringArray("4.3", "gl_compatibility")
-config/icon="res://icon.svg"
+config/icon="res://gfx/icon.png"
 
 [autoload]
 
