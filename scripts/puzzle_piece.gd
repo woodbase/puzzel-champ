@@ -90,6 +90,7 @@ func _input(event: InputEvent) -> void:
 
 
 ## Begins dragging the piece.
+## Enhanced with scale-up animation for visual feedback.
 func _start_drag(mouse_pos: Vector2) -> void:
 	if _dragging:
 		return  # Guard: ignore if already dragging (e.g. touch + emulated mouse).
@@ -97,6 +98,16 @@ func _start_drag(mouse_pos: Vector2) -> void:
 	_drag_offset = global_position - mouse_pos
 	_original_z_index = z_index
 	z_index = DRAG_Z_INDEX
+
+	# Smooth scale-up animation when picking up the piece.
+	if GameState.feedback_visual:
+		var sprite := get_node_or_null("Sprite2D") as Sprite2D
+		if sprite != null:
+			var base_scale := sprite.scale
+			var tween := create_tween()
+			tween.tween_property(sprite, "scale", base_scale * 1.08, 0.12) \
+				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+
 	piece_picked_up.emit()
 
 
@@ -106,6 +117,7 @@ func _update_drag(mouse_pos: Vector2) -> void:
 
 
 ## Ends dragging; snaps and locks the piece if close enough to its target.
+## Enhanced with scale-down animation when releasing.
 func _end_drag() -> void:
 	if not _dragging:
 		return  # Guard: ignore if not dragging (e.g. both ScreenTouch + emulated MouseButton fire).
@@ -130,30 +142,40 @@ func _end_drag() -> void:
 			_play_snap_animation()
 			_spawn_lock_particles()
 		piece_placed.emit()
+	else:
+		# Piece not snapped - scale back to normal smoothly.
+		if GameState.feedback_visual:
+			var sprite := get_node_or_null("Sprite2D") as Sprite2D
+			if sprite != null:
+				var base_scale := sprite.scale / 1.08  # Undo the pickup scale.
+				var tween := create_tween()
+				tween.tween_property(sprite, "scale", base_scale, 0.15) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 	piece_released.emit()
 
 
 ## Spawns a brief, subtle burst of golden particles at the locked position.
+## Enhanced with more particles, varied velocities, and scale animation.
 func _spawn_lock_particles() -> void:
 	var particles := CPUParticles2D.new()
 	add_child(particles)
 
-	# Burst of 12 small golden dots – one-shot, fully simultaneous.
+	# Burst of 18 small golden dots (increased from 12) – one-shot, fully simultaneous.
 	particles.one_shot = true
 	particles.explosiveness = 1.0
-	particles.amount = 12
-	particles.lifetime = 0.6
+	particles.amount = 18
+	particles.lifetime = 0.7
 
 	# Emit from a small area around the piece centre.
 	particles.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	particles.emission_sphere_radius = 4.0
+	particles.emission_sphere_radius = 6.0
 
-	# Scatter upward with a wide spread and slight gravity.
+	# Scatter upward and outward with wider spread and more varied velocity.
 	particles.direction = Vector2(0.0, -1.0)
 	particles.spread = 180.0
-	particles.initial_velocity_min = 30.0
-	particles.initial_velocity_max = 70.0
-	particles.gravity = Vector2(0.0, 60.0)
+	particles.initial_velocity_min = 40.0
+	particles.initial_velocity_max = 90.0
+	particles.gravity = Vector2(0.0, 80.0)
 
 	# Fade out over the particle lifetime via a colour gradient.
 	var color_ramp := Gradient.new()
@@ -161,9 +183,16 @@ func _spawn_lock_particles() -> void:
 	color_ramp.set_color(1, Color(PARTICLE_COLOR.r, PARTICLE_COLOR.g, PARTICLE_COLOR.b, 0.0))
 	particles.color_ramp = color_ramp
 
-	# Small square dots.
+	# Vary particle sizes more for visual interest.
 	particles.scale_amount_min = 2.0
-	particles.scale_amount_max = 4.0
+	particles.scale_amount_max = 5.0
+
+	# Add scale curve for particles to shrink as they fade.
+	var scale_curve := Curve.new()
+	scale_curve.add_point(Vector2(0.0, 1.0))
+	scale_curve.add_point(Vector2(0.7, 0.8))
+	scale_curve.add_point(Vector2(1.0, 0.3))
+	particles.scale_amount_curve = scale_curve
 
 	# Start emitting, then clean up after the burst finishes.
 	particles.emitting = true
@@ -175,17 +204,22 @@ func _spawn_lock_particles() -> void:
 
 
 ## Plays a brief scale-bounce and colour-flash animation on the sprite.
+## Enhanced with anticipation: squash → expand → elastic bounce back.
 func _play_snap_animation() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite == null:
 		return
 	var base_scale: Vector2 = sprite.scale
 	var tween := create_tween()
-	# Phase 1: scale up and flash to gold (0.10 s), both properties in parallel.
-	tween.tween_property(sprite, "scale", base_scale * 1.22, 0.10)
-	tween.parallel().tween_property(sprite, "modulate", Color(1.5, 1.3, 0.3, 1.0), 0.10)
-	# Phase 2: spring back to normal (0.20 s) with an elastic overshoot for a
-	# satisfying snap feel; colour fade runs in parallel.
-	tween.tween_property(sprite, "scale", base_scale, 0.20) \
+	# Phase 0: Quick anticipation squash (0.05 s) for snappier feel.
+	tween.tween_property(sprite, "scale", base_scale * 0.92, 0.05) \
+		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	# Phase 1: Pop up and flash to gold (0.12 s), both properties in parallel.
+	tween.tween_property(sprite, "scale", base_scale * 1.25, 0.12) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.parallel().tween_property(sprite, "modulate", Color(1.6, 1.4, 0.2, 1.0), 0.12)
+	# Phase 2: Elastic spring back to normal (0.22 s) with stronger overshoot
+	# for a more satisfying snap feel; colour fade runs in parallel.
+	tween.tween_property(sprite, "scale", base_scale, 0.22) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
-	tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.20)
+	tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.22)

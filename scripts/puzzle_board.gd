@@ -214,7 +214,8 @@ const MIN_VOLUME_LINEAR: float = 0.0001
 const ENTRY_OVERLAY_COLOR := Color(0.05, 0.05, 0.10, 1.0)
 
 ## Time in seconds between each piece's scale-in animation during board entry.
-const PIECE_STAGGER_DELAY: float = 0.03
+## Enhanced with accelerating stagger for smoother flow.
+const PIECE_STAGGER_DELAY: float = 0.025
 
 ## Width and height of the reference image thumbnail panel.
 const REFERENCE_PANEL_W: float = 160.0
@@ -1288,8 +1289,9 @@ func _animate_board_entry() -> void:
 	_hud.add_child(_entry_overlay)
 
 	var overlay_tween := create_tween()
-	overlay_tween.tween_property(_entry_overlay, "modulate:a", 0.0, 0.55) \
-		.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+	# Smoother ease curve for the fade-in.
+	overlay_tween.tween_property(_entry_overlay, "modulate:a", 0.0, 0.60) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	overlay_tween.tween_callback(func() -> void:
 		if is_instance_valid(_entry_overlay):
 			_entry_overlay.queue_free()
@@ -1297,16 +1299,26 @@ func _animate_board_entry() -> void:
 	)
 
 	# ── Layer B: Puzzle pieces assembling ──────────────────────────────────────
+	# Enhanced with accelerating stagger and varied entrance easing for better flow.
 	for i in _pieces.size():
 		var piece = _pieces[i]
 		if not is_instance_valid(piece):
 			continue
 		piece.scale = Vector2.ZERO
-		var delay: float = i * PIECE_STAGGER_DELAY
+		# Accelerating delay curve - later pieces appear faster.
+		var progress: float = float(i) / float(max(_pieces.size() - 1, 1))
+		var delay: float = i * PIECE_STAGGER_DELAY * (1.0 - progress * 0.3)
 		var piece_tween: Tween = piece.create_tween()
 		piece_tween.tween_interval(delay)
-		piece_tween.tween_property(piece, "scale", Vector2.ONE, 0.40) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		# Vary the entrance animation based on piece position for visual variety.
+		if i % 3 == 0:
+			# Every third piece uses TRANS_BACK for extra bounce.
+			piece_tween.tween_property(piece, "scale", Vector2.ONE, 0.42) \
+				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		else:
+			# Others use TRANS_CUBIC for smoother pop-in.
+			piece_tween.tween_property(piece, "scale", Vector2.ONE, 0.38) \
+				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1392,16 +1404,23 @@ func _show_complete() -> void:
 			var dim := _complete_overlay.get_child(0) as ColorRect
 			if dim != null:
 				var dim_tween := create_tween()
-				dim_tween.tween_property(dim, "modulate:a", 1.0, 0.25) \
-					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+				# Slower, smoother fade-in for the backdrop.
+				dim_tween.tween_property(dim, "modulate:a", 1.0, 0.32) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 
 			# Scale + fade the card with a short delay so the backdrop appears first.
 			if _complete_card != null:
 				var card_tween := create_tween()
-				card_tween.tween_interval(0.10)
-				card_tween.tween_property(_complete_card, "scale", Vector2.ONE, 0.35) \
+				card_tween.tween_interval(0.12)
+				# Add anticipation: start slightly smaller then bounce to full size.
+				card_tween.tween_property(_complete_card, "scale", Vector2(0.75, 0.75), 0.0)
+				card_tween.tween_property(_complete_card, "scale", Vector2(1.08, 1.08), 0.28) \
 					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-				card_tween.parallel().tween_property(_complete_card, "modulate:a", 1.0, 0.25) \
+				# Final settle with elastic overshoot.
+				card_tween.tween_property(_complete_card, "scale", Vector2.ONE, 0.18) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+				# Fade in parallel to the initial bounce.
+				card_tween.parallel().tween_property(_complete_card, "modulate:a", 1.0, 0.28) \
 					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 		else:
 			# Instant show when visual feedback is disabled.
@@ -1425,8 +1444,7 @@ func _show_complete() -> void:
 ## Piece Celebration Wave
 ## Triggers a brief cascade of scale-bounce + gold-flash animations through all
 ## locked pieces, staggered by their grid distance from the top-left corner.
-## Each piece bounces ~0.06 s after the piece diagonally before it, producing a
-## ripple that travels from the top-left to the bottom-right of the grid.
+## Enhanced with varied timing and stronger visual impact.
 func _play_piece_celebration_wave() -> void:
 	if _piece_size <= 0:
 		return
@@ -1443,14 +1461,18 @@ func _play_piece_celebration_wave() -> void:
 			continue
 		var col: int = int((correct_pos.x - _puzzle_origin.x) / float(_piece_size))
 		var row: int = int((correct_pos.y - _puzzle_origin.y) / float(_piece_size))
-		var delay: float = float(col + row) * 0.055
+		# Varied stagger based on position creates a more dynamic wave.
+		var delay: float = float(col + row) * 0.048 + randf_range(0.0, 0.015)
 		var tween := create_tween()
 		tween.tween_interval(delay)
-		tween.tween_property(sprite, "scale", Vector2(1.18, 1.18), 0.11)
-		tween.parallel().tween_property(sprite, "modulate", Color(1.5, 1.2, 0.3, 1.0), 0.11)
-		tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.20) \
+		# Stronger pop with brighter gold flash.
+		tween.tween_property(sprite, "scale", Vector2(1.22, 1.22), 0.10) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+		tween.parallel().tween_property(sprite, "modulate", Color(1.7, 1.5, 0.1, 1.0), 0.10)
+		# Longer elastic bounce back for more satisfying settle.
+		tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.25) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
-		tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.20)
+		tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.25)
 
 
 ## Creates and returns an AudioStreamPlayer loaded with a generated pickup sound.

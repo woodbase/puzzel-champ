@@ -15,20 +15,22 @@ const GLOW_COLOR: Color = Color(0.80, 0.60, 1.0)
 
 ## Number of concentric border passes drawn per frame.
 ## Higher values produce a wider, softer halo at the cost of more draw calls.
-const GLOW_LAYERS: int = 3
+const GLOW_LAYERS: int = 4
 
 ## Thickness (pixels) of each individual glow layer.
-const LAYER_THICKNESS: float = 6.0
+const LAYER_THICKNESS: float = 5.0
 
 ## How many radians per second the pulse oscillates.
-const PULSE_SPEED: float = 3.0
+## Faster pulsing for more dynamic effect.
+const PULSE_SPEED: float = 4.0
 
 ## Alpha range for the oscillating pulse.
-const ALPHA_MIN: float = 0.25
-const ALPHA_MAX: float = 0.85
+## Wider range for more dramatic pulsing.
+const ALPHA_MIN: float = 0.30
+const ALPHA_MAX: float = 0.95
 
 ## Total seconds the effect runs before fully fading out and stopping.
-const FADE_DURATION: float = 5.0
+const FADE_DURATION: float = 6.0
 
 ## Internal state.
 var _rect: Rect2 = Rect2()
@@ -71,10 +73,13 @@ func _draw() -> void:
 	if not _running:
 		return
 
-	# Linear fade from 1 → 0 over FADE_DURATION.
-	var fade: float = clampf(1.0 - (_fade_elapsed / FADE_DURATION), 0.0, 1.0)
-	# Sinusoidal pulse layered on top of the fade.
-	var pulse: float = sin(_time * PULSE_SPEED) * 0.5 + 0.5
+	# Smooth fade curve using ease-out for more natural tapering.
+	var fade_progress: float = _fade_elapsed / FADE_DURATION
+	var fade: float = clampf(1.0 - fade_progress * fade_progress, 0.0, 1.0)
+	# Dual-frequency pulse: fast oscillation modulated by slower wave for complexity.
+	var fast_pulse: float = sin(_time * PULSE_SPEED) * 0.5 + 0.5
+	var slow_pulse: float = sin(_time * PULSE_SPEED * 0.3) * 0.3 + 0.7
+	var pulse: float = fast_pulse * slow_pulse
 	var base_alpha: float = lerp(ALPHA_MIN, ALPHA_MAX, pulse) * fade
 
 	# Draw GLOW_LAYERS concentric outlines, each slightly expanded and dimmer.
