@@ -1,11 +1,14 @@
 extends Control
 
 # ─── Difficulty presets ───────────────────────────────────────────────────────
+# Ordered from easiest to most challenging, with exponential piece-count growth.
+# Each level approximately doubles the number of pieces from the previous level,
+# providing a natural difficulty progression for players.
 const DIFFICULTIES: Array[Dictionary] = [
-	{"label": "Easy",   "cols": 3, "rows": 2},
-	{"label": "Medium", "cols": 4, "rows": 3},
-	{"label": "Hard",   "cols": 6, "rows": 4},
-	{"label": "Expert", "cols": 8, "rows": 6},
+	{"label": "Easy",   "cols": 3, "rows": 2, "desc": "Perfect for beginners"},
+	{"label": "Medium", "cols": 4, "rows": 3, "desc": "A balanced challenge"},
+	{"label": "Hard",   "cols": 6, "rows": 4, "desc": "For experienced players"},
+	{"label": "Expert", "cols": 8, "rows": 6, "desc": "The ultimate test"},
 ]
 
 # ─── Piece shape presets ──────────────────────────────────────────────────────
@@ -61,6 +64,7 @@ var _shape_btns: Array[Button]             = []
 var _preview_rect: TextureRect   = null
 var _no_image_lbl: Label         = null
 var _piece_count_lbl: Label      = null
+var _difficulty_desc_lbl: Label  = null
 var _start_btn: Button           = null
 var _file_dialog: FileDialog     = null
 var _gallery_grid: GridContainer = null  # kept for dynamic item insertion
@@ -424,6 +428,12 @@ func _build_settings_panel() -> Control:
 	_piece_count_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
 	vbox.add_child(_piece_count_lbl)
 
+	_difficulty_desc_lbl = Label.new()
+	_difficulty_desc_lbl.add_theme_font_size_override("font_size", 13)
+	_difficulty_desc_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR.lightened(0.15))
+	_difficulty_desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_difficulty_desc_lbl)
+
 	# ── Piece Shape ──
 	var shape_hdr := Label.new()
 	shape_hdr.text = "Piece Shape"
@@ -586,6 +596,11 @@ func _apply_difficulty(index: int) -> void:
 			total, d["cols"], d["rows"]
 		]
 
+	# Update difficulty description label.
+	if _difficulty_desc_lbl != null:
+		var d := DIFFICULTIES[index]
+		_difficulty_desc_lbl.text = d["desc"]
+
 
 func _find_difficulty_index(c: int, r: int) -> int:
 	for i in range(DIFFICULTIES.size()):
@@ -596,9 +611,9 @@ func _find_difficulty_index(c: int, r: int) -> int:
 
 ## Returns the most appropriate default difficulty index for the current screen.
 ## Mobile / small-screen devices get Easy (fewest pieces, easiest to tap);
-## desktops and tablets in landscape get Hard (more pieces, better use of space).
+## desktops and tablets get Medium for a balanced starting experience.
 func _default_difficulty_for_screen() -> int:
-	return 0 if UIScale.is_mobile() else 2  # Easy for mobile, Hard for desktop
+	return 0 if UIScale.is_mobile() else 1  # Easy for mobile, Medium for desktop
 
 
 func _apply_shape(index: int) -> void:
