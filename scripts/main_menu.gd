@@ -393,6 +393,38 @@ func _build_gallery_item(index: int) -> PanelContainer:
 				_select_gallery_item(i)
 	)
 
+	# Add a delete button overlay for user-uploaded images (identified by
+	# their user:// path prefix).  Default bundled images cannot be deleted.
+	if index < _gallery_paths.size() and _gallery_paths[index].begins_with("user://"):
+		var overlay := Control.new()
+		overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		container.add_child(overlay)
+
+		var del_btn := Button.new()
+		del_btn.text = "×"
+		del_btn.anchor_left   = 1.0
+		del_btn.anchor_top    = 0.0
+		del_btn.anchor_right  = 1.0
+		del_btn.anchor_bottom = 0.0
+		del_btn.offset_left   = -22
+		del_btn.offset_top    = 2
+		del_btn.offset_right  = -2
+		del_btn.offset_bottom = 22
+		del_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		del_btn.add_theme_font_size_override("font_size", 13)
+		del_btn.add_theme_color_override("font_color", Color.WHITE)
+		for state in ["normal", "hover", "pressed"]:
+			var sb := StyleBoxFlat.new()
+			match state:
+				"normal":  sb.bg_color = Color(0.60, 0.10, 0.10, 0.85)
+				"hover":   sb.bg_color = Color(0.85, 0.15, 0.15, 0.95)
+				"pressed": sb.bg_color = Color(0.45, 0.08, 0.08, 0.95)
+			_set_corner_radius(sb, 4)
+			del_btn.add_theme_stylebox_override(state, sb)
+		del_btn.pressed.connect(func() -> void: _on_delete_gallery_item(i))
+		overlay.add_child(del_btn)
+
 	return container
 
 
@@ -728,6 +760,69 @@ func _on_file_selected(path: String) -> void:
 		_gallery_items.append(item)
 
 	_apply_selection(tex, use_path, new_index)
+
+
+## Prompts the user to confirm deletion of a user-uploaded gallery item.
+func _on_delete_gallery_item(index: int) -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Remove Image"
+	dialog.dialog_text = "Remove this image from your gallery?\nThe file will be permanently deleted."
+	add_child(dialog)
+	dialog.popup_centered()
+	dialog.confirmed.connect(func() -> void:
+		_delete_user_gallery_item(index)
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(dialog.queue_free)
+
+
+## Deletes the file at *index* from disk, removes it from all gallery arrays,
+## rebuilds the gallery grid, and resets the selection when necessary.
+func _delete_user_gallery_item(index: int) -> void:
+	if index < 0 or index >= _gallery_paths.size():
+		return
+
+	var path := _gallery_paths[index]
+	if path.begins_with("user://"):
+		var abs_path := ProjectSettings.globalize_path(path)
+		var err := DirAccess.remove_absolute(abs_path)
+		if err != OK:
+			_show_error("Could not delete the image file.\nPlease try again.")
+			return
+
+	_gallery_textures.remove_at(index)
+	_gallery_thumb_textures.remove_at(index)
+	_gallery_paths.remove_at(index)
+
+	# Add a placeholder when the gallery becomes empty so the UI never breaks.
+	if _gallery_textures.is_empty():
+		var placeholder := Image.create(THUMBNAIL_SIZE, THUMBNAIL_SIZE, false, Image.FORMAT_RGBA8)
+		placeholder.fill(Color(0.20, 0.22, 0.30))
+		var placeholder_tex := ImageTexture.create_from_image(placeholder)
+		_gallery_textures.append(placeholder_tex)
+		_gallery_thumb_textures.append(placeholder_tex)
+		_gallery_paths.append("")
+
+	# Update the active selection index to stay consistent after the removal.
+	if _active_gallery_idx == index:
+		# Deleted the selected item; select the nearest remaining one.
+		var new_idx := clampi(index, 0, _gallery_textures.size() - 1)
+		_active_gallery_idx = -1  # clear before calling to force a refresh
+		_select_gallery_item(new_idx)
+	elif _active_gallery_idx > index:
+		_active_gallery_idx -= 1
+
+	# Rebuild all gallery items so captured index closures are up-to-date.
+	if _gallery_grid != null:
+		for child in _gallery_grid.get_children():
+			child.free()
+		_gallery_items.clear()
+		for i in range(_gallery_textures.size()):
+			var item := _build_gallery_item(i)
+			_gallery_grid.add_child(item)
+			_gallery_items.append(item)
+		if _active_gallery_idx >= 0 and _active_gallery_idx < _gallery_items.size():
+			_set_gallery_item_style(_gallery_items[_active_gallery_idx], true)
 
 
 func _on_start_pressed() -> void:
