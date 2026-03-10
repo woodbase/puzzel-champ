@@ -132,6 +132,30 @@ var _hud_hbox: HBoxContainer = null
 ## refreshed when the layout changes.
 var _hud_buttons: Array[Button] = []
 
+## Sorting-box data list.  Each element is a Dictionary with keys:
+##   "name"   – display label (String)
+##   "pieces" – piece nodes currently stored in this box (Array)
+##   "button" – the Button node in the left panel (Button)
+var _sorting_boxes: Array = []
+
+## Panel containing sorting-box buttons on the left side below the reference image.
+var _box_panel: Control = null
+
+## VBoxContainer inside the sorting-box panel that holds the box buttons.
+var _box_vbox: VBoxContainer = null
+
+## Full-screen overlay shown when the player opens a sorting box to view its pieces.
+var _box_view_overlay: Control = null
+
+## GridContainer inside the box-view overlay that holds piece thumbnails.
+var _box_view_grid: GridContainer = null
+
+## Title label inside the box-view overlay.
+var _box_view_title: Label = null
+
+## Index of the sorting box currently displayed in the view overlay (-1 = none).
+var _open_box_index: int = -1
+
 ## Tracks the portrait/landscape state from the last layout update.
 ## Used to detect orientation flips and trigger a puzzle rebuild so pieces
 ## always fit the newly-rotated screen.
@@ -184,6 +208,18 @@ const REFERENCE_PANEL_MARGIN: float = 8.0
 ## Source image pieces are downscaled to at most 1.35 × the on-screen piece size
 ## so GPU memory / bandwidth stay reasonable on mobile while keeping detail.
 const SOURCE_OVERSAMPLE: float = 1.35
+
+## Predefined sorting-box category names shown to the player by default.
+const SORTING_BOX_DEFAULTS: Array[String] = ["Edge Pieces", "Sky", "Buildings", "Other"]
+
+## Width of the sorting-box panel (matches the reference panel for visual consistency).
+const BOX_PANEL_W: float = 160.0
+
+## Vertical gap between the bottom of the reference panel and the top of the sorting panel.
+const BOX_PANEL_TOP_GAP: float = 4.0
+
+## Height of each individual box-entry button in the panel.
+const BOX_BUTTON_H: float = 34.0
 
 
 func _ready() -> void:
@@ -321,6 +357,7 @@ func _build_hud() -> void:
 	_build_settings_panel()
 	_build_complete_overlay()
 	_build_preview_panel()
+	_build_sorting_boxes_panel()
 
 
 func _make_hud_button(label_text: String) -> Button:
@@ -391,6 +428,12 @@ func _on_layout_changed() -> void:
 	if _preview_panel != null:
 		_preview_panel.offset_top    = HUD_H + REFERENCE_PANEL_MARGIN
 		_preview_panel.offset_bottom = HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H
+
+	# Reposition the sorting-box panel directly below the reference panel.
+	if _box_panel != null:
+		var box_top := HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H + BOX_PANEL_TOP_GAP
+		_box_panel.offset_top    = box_top
+		_box_panel.offset_bottom = box_top + _sorting_boxes_panel_height()
 
 	# Rebuild the puzzle when the device orientation flips (portrait ↔ landscape)
 	# so that all piece positions and the grid layout fit the new screen dimensions.
@@ -1249,9 +1292,17 @@ func on_piece_picked_up(piece) -> void:
 
 ## Called by each PuzzlePiece when the player releases it (placed or dropped).
 func _on_piece_released() -> void:
+	# Capture the piece reference before clearing _dragged_piece, so we can
+	# check box-drop targeting below.
+	var released_piece = _dragged_piece
 	_dragged_piece = null
 	_last_drag_pos = Vector2.ZERO
 	queue_redraw()
+	# If the piece was not snapped into its final slot, check whether it was
+	# dropped over a sorting-box button and, if so, store it there.
+	if released_piece != null and is_instance_valid(released_piece) \
+			and not released_piece.is_locked:
+		_try_add_piece_to_box(released_piece)
 
 
 ## Displays the completion overlay with an entrance animation, plays the
@@ -1561,6 +1612,9 @@ func _on_restart_puzzle() -> void:
 		_entry_overlay.queue_free()
 		_entry_overlay = null
 
+	# Return all pieces from sorting boxes so the restart loop can reposition them.
+	_clear_all_sorting_boxes()
+
 	_placed_pieces = 0
 	_update_counter()
 
@@ -1570,6 +1624,7 @@ func _on_restart_puzzle() -> void:
 			continue
 		piece.is_locked = false
 		piece.input_pickable = true
+		piece.visible = true
 		piece.z_index = 0
 		if i < _pieces_initial_positions.size():
 			piece.position = _pieces_initial_positions[i]
@@ -1597,6 +1652,9 @@ func _on_new_puzzle() -> void:
 		_entry_overlay.queue_free()
 		_entry_overlay = null
 
+	# Clear box piece lists before freeing pieces so references don't linger.
+	_clear_all_sorting_boxes()
+
 	for piece in get_tree().get_nodes_in_group("puzzle_pieces"):
 		piece.queue_free()
 	_pieces.clear()
@@ -1610,3 +1668,468 @@ func _on_new_puzzle() -> void:
 	await get_tree().process_frame
 	_build_puzzle()
 	_building = false
+
+
+# ─── Sorting boxes ────────────────────────────────────────────────────────────
+
+## Builds the sorting-box panel anchored to the left side of the workspace,
+## directly below the reference image panel.  Predefined categories are shown
+## as buttons; an add-custom row lets the player create new categories.
+func _build_sorting_boxes_panel() -> void:
+	_sorting_boxes.clear()
+	for box_name: String in SORTING_BOX_DEFAULTS:
+		_sorting_boxes.append({"name": box_name, "pieces": [], "button": null})
+
+	var panel := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color                   = Color(0.10, 0.09, 0.18, 0.92)
+	ps.corner_radius_top_left     = 8
+	ps.corner_radius_top_right    = 8
+	ps.corner_radius_bottom_left  = 8
+	ps.corner_radius_bottom_right = 8
+	ps.border_width_left   = 1
+	ps.border_width_right  = 1
+	ps.border_width_top    = 1
+	ps.border_width_bottom = 1
+	ps.border_color = Color(0.45, 0.28, 0.78)
+	panel.add_theme_stylebox_override("panel", ps)
+	panel.anchor_left   = 0.0
+	panel.anchor_right  = 0.0
+	panel.anchor_top    = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left   = REFERENCE_PANEL_MARGIN
+	panel.offset_right  = REFERENCE_PANEL_MARGIN + BOX_PANEL_W
+	var box_top := HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H + BOX_PANEL_TOP_GAP
+	panel.offset_top    = box_top
+	panel.offset_bottom = box_top + _sorting_boxes_panel_height()
+	_hud.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left",   6)
+	margin.add_theme_constant_override("margin_right",  6)
+	margin.add_theme_constant_override("margin_top",    6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(vbox)
+	_box_vbox = vbox
+
+	# ── Header ──
+	var hdr := Label.new()
+	hdr.text = "Sort Boxes"
+	hdr.add_theme_font_size_override("font_size", 11)
+	hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
+	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(hdr)
+
+	# ── Box buttons (one per predefined category) ──
+	for i in _sorting_boxes.size():
+		_append_box_button(i)
+
+	# ── Separator ──
+	var sep := HSeparator.new()
+	sep.add_theme_color_override("color", Color(0.35, 0.28, 0.50))
+	vbox.add_child(sep)
+
+	# ── Add-custom row: LineEdit + "+" button ──
+	var add_row := HBoxContainer.new()
+	add_row.add_theme_constant_override("separation", 4)
+	vbox.add_child(add_row)
+
+	var name_edit := LineEdit.new()
+	name_edit.placeholder_text = "New box…"
+	name_edit.add_theme_font_size_override("font_size", 11)
+	name_edit.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	name_edit.custom_minimum_size = Vector2(0, 24)
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(name_edit)
+
+	var add_btn := _make_small_icon_button("+")
+	add_btn.tooltip_text = "Add custom sorting box"
+	add_btn.pressed.connect(func() -> void:
+		var n := name_edit.text.strip_edges()
+		if n.length() > 0:
+			_add_custom_box(n)
+			name_edit.text = ""
+	)
+	add_row.add_child(add_btn)
+
+	_box_panel = panel
+	_build_box_view_overlay()
+
+
+## Appends a styled button for the sorting box at box_idx to _box_vbox,
+## inserting it before the separator so box buttons always stay above it.
+func _append_box_button(box_idx: int) -> void:
+	if _box_vbox == null or box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	var box: Dictionary = _sorting_boxes[box_idx]
+
+	var btn := Button.new()
+	var box_pieces: Array = box.pieces
+	btn.text = "%s [%d]" % [box.name, box_pieces.size()]
+	btn.add_theme_font_size_override("font_size", 12)
+	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.tooltip_text = "Open box: %s\n(drop pieces here to sort them)" % box.name
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	for state in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		match state:
+			"normal":  sb.bg_color = Color(0.25, 0.16, 0.48)
+			"hover":   sb.bg_color = Color(0.36, 0.23, 0.62)
+			"pressed": sb.bg_color = Color(0.18, 0.11, 0.36)
+		sb.corner_radius_top_left     = 5
+		sb.corner_radius_top_right    = 5
+		sb.corner_radius_bottom_left  = 5
+		sb.corner_radius_bottom_right = 5
+		sb.content_margin_left   = 6
+		sb.content_margin_right  = 6
+		sb.content_margin_top    = 3
+		sb.content_margin_bottom = 3
+		btn.add_theme_stylebox_override(state, sb)
+
+	var i := box_idx
+	btn.pressed.connect(func() -> void: _open_box_view(i))
+	box.button = btn
+	_box_vbox.add_child(btn)
+	# Keep the button before the separator: index 0 is the header label,
+	# so box buttons occupy indices 1 … N.
+	_box_vbox.move_child(btn, 1 + box_idx)
+
+
+## Creates a small square icon button used in the sorting-box panel.
+func _make_small_icon_button(label_text: String) -> Button:
+	var btn := Button.new()
+	btn.text = label_text
+	btn.add_theme_font_size_override("font_size", 14)
+	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	btn.custom_minimum_size = Vector2(26, 26)
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	for state in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		match state:
+			"normal":  sb.bg_color = Color(0.28, 0.18, 0.52)
+			"hover":   sb.bg_color = Color(0.38, 0.25, 0.65)
+			"pressed": sb.bg_color = Color(0.20, 0.12, 0.40)
+		sb.corner_radius_top_left     = 4
+		sb.corner_radius_top_right    = 4
+		sb.corner_radius_bottom_left  = 4
+		sb.corner_radius_bottom_right = 4
+		sb.content_margin_left   = 2
+		sb.content_margin_right  = 2
+		sb.content_margin_top    = 2
+		sb.content_margin_bottom = 2
+		btn.add_theme_stylebox_override(state, sb)
+	return btn
+
+
+## Returns the pixel height the sorting-box panel should occupy.
+## Header (~18 px) + N buttons × BOX_BUTTON_H + (N-1) × 4 px separation
+## + separator (8 px) + gap (4 px) + add-row (28 px) + margins (12 px).
+func _sorting_boxes_panel_height() -> float:
+	var n := _sorting_boxes.size()
+	return 18.0 \
+		+ float(n) * BOX_BUTTON_H \
+		+ float(maxi(n - 1, 0)) * 4.0 \
+		+ 4.0 + 8.0 + 28.0 + 12.0
+
+
+## Recalculates and applies the correct height for the sorting-box panel
+## (called when boxes are added).
+func _update_box_panel_size() -> void:
+	if _box_panel == null:
+		return
+	var top: float = _box_panel.offset_top
+	_box_panel.offset_bottom = top + _sorting_boxes_panel_height()
+
+
+## Builds the full-screen box-view overlay (hidden until a box is opened).
+## Piece thumbnails fill a scrollable grid; clicking one returns it to the table.
+func _build_box_view_overlay() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.visible = false
+	_hud.add_child(overlay)
+
+	# Dark semi-transparent backdrop — clicking anywhere on it closes the view.
+	var bg := ColorRect.new()
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.0, 0.0, 0.0, 0.80)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(bg)
+	bg.gui_input.connect(_on_box_view_backdrop_input)
+
+	# Centred card.
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color                   = Color(0.10, 0.09, 0.18, 0.96)
+	ps.corner_radius_top_left     = 10
+	ps.corner_radius_top_right    = 10
+	ps.corner_radius_bottom_left  = 10
+	ps.corner_radius_bottom_right = 10
+	ps.border_width_left   = 2
+	ps.border_width_right  = 2
+	ps.border_width_top    = 2
+	ps.border_width_bottom = 2
+	ps.border_color = Color(0.55, 0.35, 0.90)
+	card.add_theme_stylebox_override("panel", ps)
+	card.custom_minimum_size = Vector2(UIScale.px(320.0), UIScale.px(200.0))
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(card)
+
+	var inner_margin := MarginContainer.new()
+	inner_margin.add_theme_constant_override("margin_left",   12)
+	inner_margin.add_theme_constant_override("margin_right",  12)
+	inner_margin.add_theme_constant_override("margin_top",    10)
+	inner_margin.add_theme_constant_override("margin_bottom", 10)
+	inner_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(inner_margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner_margin.add_child(vbox)
+
+	# Title row: box name left, close button right.
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 8)
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(title_row)
+
+	var title_lbl := Label.new()
+	title_lbl.text = ""
+	title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(14))
+	title_lbl.add_theme_color_override("font_color", Color(0.85, 0.78, 1.0))
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_child(title_lbl)
+	_box_view_title = title_lbl
+
+	var close_btn := _make_small_icon_button("X")
+	close_btn.tooltip_text = "Close box view"
+	close_btn.pressed.connect(_close_box_view)
+	title_row.add_child(close_btn)
+
+	# Hint label.
+	var hint := Label.new()
+	hint.text = "Click a piece to return it to the table"
+	hint.add_theme_font_size_override("font_size", UIScale.font_size(11))
+	hint.add_theme_color_override("font_color", Color(0.60, 0.55, 0.80))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(hint)
+
+	# Scrollable grid of piece thumbnails.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(UIScale.px(296.0), UIScale.px(140.0))
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	vbox.add_child(scroll)
+
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scroll.add_child(grid)
+	_box_view_grid = grid
+
+	_box_view_overlay = overlay
+
+
+## Opens the box-view overlay for the sorting box at box_idx.
+func _open_box_view(box_idx: int) -> void:
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	_open_box_index = box_idx
+	_refresh_box_view()
+	if _box_view_overlay != null:
+		_box_view_overlay.visible = true
+
+
+## Closes the box-view overlay.
+func _close_box_view() -> void:
+	_open_box_index = -1
+	if _box_view_overlay != null:
+		_box_view_overlay.visible = false
+
+
+## Dismisses the box-view overlay when the player clicks the dark backdrop.
+func _on_box_view_backdrop_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			_close_box_view()
+
+
+## Rebuilds the thumbnail grid to reflect the current contents of the open box.
+func _refresh_box_view() -> void:
+	if _box_view_grid == null \
+			or _open_box_index < 0 \
+			or _open_box_index >= _sorting_boxes.size():
+		return
+
+	var box: Dictionary = _sorting_boxes[_open_box_index]
+	var box_pieces: Array = box.pieces
+
+	if _box_view_title != null:
+		_box_view_title.text = "Box: %s  (%d piece%s)" % [
+			box.name,
+			box_pieces.size(),
+			"" if box_pieces.size() == 1 else "s",
+		]
+
+	# Clear existing thumbnails.
+	for child in _box_view_grid.get_children():
+		child.queue_free()
+
+	if box_pieces.is_empty():
+		_box_view_grid.columns = 1
+		var empty_lbl := Label.new()
+		empty_lbl.text = "No pieces stored here.\nDrag pieces onto this box to sort them."
+		empty_lbl.add_theme_font_size_override("font_size", 12)
+		empty_lbl.add_theme_color_override("font_color", Color(0.55, 0.50, 0.75))
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_box_view_grid.add_child(empty_lbl)
+		return
+
+	_box_view_grid.columns = 4
+	for pi in box_pieces.size():
+		var piece = box_pieces[pi]
+		if not is_instance_valid(piece):
+			continue
+
+		var thumb_btn := Button.new()
+		thumb_btn.custom_minimum_size = Vector2(64, 64)
+		thumb_btn.tooltip_text = "Return to table"
+		thumb_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		for state in ["normal", "hover", "pressed"]:
+			var sb := StyleBoxFlat.new()
+			match state:
+				"normal":  sb.bg_color = Color(0.20, 0.16, 0.38)
+				"hover":   sb.bg_color = Color(0.32, 0.25, 0.55)
+				"pressed": sb.bg_color = Color(0.14, 0.10, 0.28)
+			sb.corner_radius_top_left     = 6
+			sb.corner_radius_top_right    = 6
+			sb.corner_radius_bottom_left  = 6
+			sb.corner_radius_bottom_right = 6
+			sb.content_margin_left   = 2
+			sb.content_margin_right  = 2
+			sb.content_margin_top    = 2
+			sb.content_margin_bottom = 2
+			thumb_btn.add_theme_stylebox_override(state, sb)
+
+		var sprite := piece.get_node_or_null("Sprite2D") as Sprite2D
+		if sprite != null and sprite.texture != null:
+			var tex_rect := TextureRect.new()
+			tex_rect.texture      = sprite.texture
+			tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tex_rect.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+			tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			thumb_btn.add_child(tex_rect)
+
+		var current_pi := pi
+		var current_box_idx := _open_box_index
+		thumb_btn.pressed.connect(func() -> void:
+			_remove_piece_from_box(current_box_idx, current_pi)
+		)
+		_box_view_grid.add_child(thumb_btn)
+
+
+## Adds the given piece to the sorting box at box_idx, hiding it from the table.
+func _add_piece_to_box(box_idx: int, piece) -> void:
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	if not is_instance_valid(piece):
+		return
+	var box: Dictionary = _sorting_boxes[box_idx]
+	var box_pieces: Array = box.pieces
+	box_pieces.append(piece)
+	piece.visible = false
+	var btn: Button = box.get("button")
+	if btn != null and is_instance_valid(btn):
+		btn.text = "%s [%d]" % [box.name, box_pieces.size()]
+
+
+## Removes the piece at piece_idx from the box and returns it to the table.
+## The piece is placed at a random position within the visible viewport area.
+func _remove_piece_from_box(box_idx: int, piece_idx: int) -> void:
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	var box: Dictionary = _sorting_boxes[box_idx]
+	var box_pieces: Array = box.pieces
+	if piece_idx < 0 or piece_idx >= box_pieces.size():
+		return
+
+	var piece = box_pieces[piece_idx]
+	box_pieces.remove_at(piece_idx)
+
+	if is_instance_valid(piece):
+		piece.visible = true
+		var vp := get_viewport_rect().size
+		var half: float = float(_piece_size) * 0.5 if _piece_size > 0 else 40.0
+		piece.position = Vector2(
+			randf_range(half, vp.x - half),
+			randf_range(HUD_H + half, vp.y - half)
+		)
+
+	var btn: Button = box.get("button")
+	if btn != null and is_instance_valid(btn):
+		btn.text = "%s [%d]" % [box.name, box_pieces.size()]
+
+	# Refresh the overlay so the removed thumbnail disappears immediately.
+	if _open_box_index == box_idx:
+		_refresh_box_view()
+
+
+## Checks whether the recently-released piece was dropped over a sorting-box
+## button and, if so, stores it inside that box.
+func _try_add_piece_to_box(piece) -> void:
+	if not is_instance_valid(piece):
+		return
+	var mouse_pos := get_viewport().get_mouse_position()
+	for i in _sorting_boxes.size():
+		var btn: Button = _sorting_boxes[i].get("button")
+		if btn == null or not is_instance_valid(btn):
+			continue
+		if btn.get_global_rect().has_point(mouse_pos):
+			_add_piece_to_box(i, piece)
+			return
+
+
+## Adds a new custom sorting box and appends its button to the panel.
+func _add_custom_box(box_name: String) -> void:
+	var new_idx := _sorting_boxes.size()
+	_sorting_boxes.append({"name": box_name, "pieces": [], "button": null})
+	_append_box_button(new_idx)
+	_update_box_panel_size()
+
+
+## Returns all pieces from every sorting box to the table and clears box data.
+## Does not reset piece positions – callers handle that separately if needed.
+func _clear_all_sorting_boxes() -> void:
+	for box in _sorting_boxes:
+		var box_pieces: Array = box.pieces
+		for piece in box_pieces:
+			if is_instance_valid(piece):
+				piece.visible = true
+		box_pieces.clear()
+		var btn: Button = box.get("button")
+		if btn != null and is_instance_valid(btn):
+			btn.text = "%s [0]" % box.name
+	_close_box_view()
