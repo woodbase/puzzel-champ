@@ -106,8 +106,13 @@ var _music_player: AudioStreamPlayer = null
 ## The settings panel overlay (visibility toggled by the settings button).
 var _settings_panel: Control = null
 
-## Floating preview panel that shows the reference image in a corner.
+## Floating reference image panel anchored to the top-left corner of the screen.
+## Visible by default; toggled with the HUD "Preview" button.
 var _preview_panel: Control = null
+
+## Full-screen zoom overlay shown when the player clicks the reference panel.
+## Dismissed by clicking anywhere on the overlay backdrop.
+var _zoom_overlay: Control = null
 
 ## Preview toggle button stored so its label can be updated.
 var _preview_toggle_btn: Button = null
@@ -146,6 +151,12 @@ const ENTRY_OVERLAY_COLOR := Color(0.05, 0.05, 0.10, 1.0)
 
 ## Time in seconds between each piece's scale-in animation during board entry.
 const PIECE_STAGGER_DELAY: float = 0.03
+
+## Width and height of the reference image thumbnail panel.
+const REFERENCE_PANEL_W: float = 160.0
+const REFERENCE_PANEL_H: float = 120.0
+## Gap between the reference panel and the screen / HUD edges.
+const REFERENCE_PANEL_MARGIN: float = 8.0
 
 
 func _ready() -> void:
@@ -252,7 +263,7 @@ func _build_hud() -> void:
 	_hud_hbox.add_child(restart_btn)
 	_hud_buttons.append(restart_btn)
 
-	_preview_toggle_btn = _make_hud_button("Preview: Off")
+	_preview_toggle_btn = _make_hud_button("Preview: On")
 	_preview_toggle_btn.pressed.connect(_toggle_preview)
 	_preview_toggle_btn.tooltip_text = "Show / hide puzzle reference image"
 	_hud_hbox.add_child(_preview_toggle_btn)
@@ -344,9 +355,11 @@ func _on_layout_changed() -> void:
 		_settings_panel.offset_top    = HUD_H + 4
 		_settings_panel.offset_bottom = HUD_H + 4 + _settings_panel_height()
 
-	# Keep the preview panel in the bottom-right corner via anchor-based positioning.
-	# No manual repositioning is needed since _preview_panel uses anchor values of
-	# (1,1,1,1) which automatically track the viewport's bottom-right corner.
+	# Reposition the reference panel below the (possibly resized) HUD bar.
+	# The top offset depends on HUD_H which changes with orientation/scale.
+	if _preview_panel != null:
+		_preview_panel.offset_top    = HUD_H + REFERENCE_PANEL_MARGIN
+		_preview_panel.offset_bottom = HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H
 
 	# Rebuild the puzzle when the device orientation flips (portrait ↔ landscape)
 	# so that all piece positions and the grid layout fit the new screen dimensions.
@@ -602,8 +615,9 @@ func _make_menu_small_button(label_text: String) -> Button:
 	return btn
 
 
-## Builds the optional floating preview panel anchored to the bottom-right corner.
-## The panel is hidden by default and toggled with the "Preview" HUD button.
+## Builds the reference image panel anchored to the top-left corner (below the HUD).
+## The panel is visible by default; clicking it opens a zoomed view.
+## Toggled with the "Preview" HUD button.
 func _build_preview_panel() -> void:
 	var panel := PanelContainer.new()
 	var ps := StyleBoxFlat.new()
@@ -619,20 +633,17 @@ func _build_preview_panel() -> void:
 	ps.border_color = Color(0.45, 0.28, 0.78)
 	panel.add_theme_stylebox_override("panel", ps)
 
-	# Anchor to bottom-right corner.
-	const PREVIEW_W: float = 200.0
-	const PREVIEW_H: float = 150.0
-	const PREVIEW_MARGIN: float = 10.0
-	panel.anchor_left   = 1.0
-	panel.anchor_right  = 1.0
-	panel.anchor_top    = 1.0
-	panel.anchor_bottom = 1.0
-	panel.offset_left   = -(PREVIEW_W + PREVIEW_MARGIN)
-	panel.offset_right  = -PREVIEW_MARGIN
-	panel.offset_top    = -(PREVIEW_H + PREVIEW_MARGIN)
-	panel.offset_bottom = -PREVIEW_MARGIN
-	panel.visible = false
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Anchor to top-left corner, positioned below the HUD bar.
+	panel.anchor_left   = 0.0
+	panel.anchor_right  = 0.0
+	panel.anchor_top    = 0.0
+	panel.anchor_bottom = 0.0
+	panel.offset_left   = REFERENCE_PANEL_MARGIN
+	panel.offset_right  = REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_W
+	panel.offset_top    = HUD_H + REFERENCE_PANEL_MARGIN
+	panel.offset_bottom = HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H
+	panel.visible = true
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_hud.add_child(panel)
 
 	var inner := MarginContainer.new()
@@ -649,7 +660,7 @@ func _build_preview_panel() -> void:
 	inner.add_child(vbox)
 
 	var hdr := Label.new()
-	hdr.text = "Reference"
+	hdr.text = "Reference (click to zoom)"
 	hdr.add_theme_font_size_override("font_size", 11)
 	hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
 	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -662,18 +673,121 @@ func _build_preview_panel() -> void:
 	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tex_rect.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	tex_rect.custom_minimum_size   = Vector2(PREVIEW_W - 12.0, PREVIEW_H - 24.0)
+	tex_rect.custom_minimum_size   = Vector2(REFERENCE_PANEL_W - 12.0, REFERENCE_PANEL_H - 24.0)
 	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(tex_rect)
 
+	# Clicking the panel opens the zoom overlay.
+	panel.gui_input.connect(_on_reference_panel_input)
+
 	_preview_panel = panel
 
+	# Build the zoom overlay (hidden until the panel is clicked).
+	_build_zoom_overlay()
 
-## Toggles the optional preview image panel and updates the button label.
+
+## Builds a fullscreen zoom overlay containing a large centred view of the
+## reference image.  Hidden by default; shown when the reference panel is clicked
+## and dismissed by clicking the backdrop.
+func _build_zoom_overlay() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.visible = false
+	# Render above the reference panel but below any completion card.
+	_hud.add_child(overlay)
+
+	# Semi-transparent dark backdrop — clicking anywhere on it dismisses the zoom.
+	var bg := ColorRect.new()
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.0, 0.0, 0.0, 0.78)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(bg)
+	bg.gui_input.connect(_on_zoom_backdrop_input)
+
+	# Centred card that holds the large image.
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.10, 0.09, 0.18, 0.96)
+	ps.corner_radius_top_left     = 10
+	ps.corner_radius_top_right    = 10
+	ps.corner_radius_bottom_left  = 10
+	ps.corner_radius_bottom_right = 10
+	ps.border_width_left   = 2
+	ps.border_width_right  = 2
+	ps.border_width_top    = 2
+	ps.border_width_bottom = 2
+	ps.border_color = Color(0.55, 0.35, 0.90)
+	card.add_theme_stylebox_override("panel", ps)
+	# Limit card size so the image fills most of the screen without overflow.
+	card.custom_minimum_size = Vector2(UIScale.px(320.0), UIScale.px(240.0))
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(card)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left",   8)
+	margin.add_theme_constant_override("margin_right",  8)
+	margin.add_theme_constant_override("margin_top",    8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(vbox)
+
+	var zoom_hdr := Label.new()
+	zoom_hdr.text = "Reference Image (click outside to close)"
+	zoom_hdr.add_theme_font_size_override("font_size", UIScale.font_size(13))
+	zoom_hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
+	zoom_hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	zoom_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(zoom_hdr)
+
+	var zoom_tex := TextureRect.new()
+	zoom_tex.texture      = source_texture
+	zoom_tex.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	zoom_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	zoom_tex.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	zoom_tex.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	zoom_tex.custom_minimum_size   = Vector2(UIScale.px(300.0), UIScale.px(220.0))
+	zoom_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(zoom_tex)
+
+	_zoom_overlay = overlay
+
+
+## Handles mouse input on the reference panel thumbnail to open the zoom view.
+func _on_reference_panel_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			if _zoom_overlay != null:
+				_zoom_overlay.visible = true
+
+
+## Handles mouse input on the zoom overlay backdrop to dismiss it.
+func _on_zoom_backdrop_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			if _zoom_overlay != null:
+				_zoom_overlay.visible = false
+
+
+## Toggles the optional reference image panel and updates the button label.
 func _toggle_preview() -> void:
 	if _preview_panel == null:
 		return
 	_preview_panel.visible = not _preview_panel.visible
+	# Also hide zoom overlay when panel is hidden.
+	if _zoom_overlay != null and not _preview_panel.visible:
+		_zoom_overlay.visible = false
 	if _preview_toggle_btn != null:
 		_preview_toggle_btn.text = "Preview: On" if _preview_panel.visible else "Preview: Off"
 
@@ -1023,6 +1137,9 @@ func _on_piece_released() -> void:
 ##   3. Confetti rain begins (3.5 s spawn window).
 ##   4. Puzzle glow + piece celebration wave play on the board behind the card.
 func _show_complete() -> void:
+	# Dismiss the zoom overlay so it does not cover the completion card.
+	if _zoom_overlay != null:
+		_zoom_overlay.visible = false
 	if _complete_overlay != null:
 		_complete_overlay.visible = true
 
