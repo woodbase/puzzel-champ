@@ -44,6 +44,22 @@ var _generator: Object = null
 ## HUD label showing piece progress.
 var _counter_label: Label = null
 
+## HUD label showing elapsed puzzle time.
+var _timer_label: Label = null
+
+## Accumulated elapsed time in seconds since the current puzzle began.
+var _timer_elapsed: float = 0.0
+
+## True while the puzzle timer is counting up (puzzle in progress).
+var _timer_running: bool = false
+
+## Last whole-second value shown in the timer label; used to avoid redundant
+## label updates every frame when the displayed value has not changed.
+var _timer_last_s: int = -1
+
+## Label inside the completion card that shows the final solve time.
+var _complete_time_lbl: Label = null
+
 ## Fullscreen overlay shown when the puzzle is complete.
 var _complete_overlay: Control = null
 
@@ -263,7 +279,13 @@ func _ready() -> void:
 		_music_player.play()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _timer_running:
+		_timer_elapsed += delta
+		var current_s: int = int(_timer_elapsed)
+		if current_s != _timer_last_s:
+			_timer_last_s = current_s
+			_update_timer_label()
 	if _dragged_piece != null and GameState.feedback_visual:
 		var current_pos: Vector2 = _dragged_piece.global_position
 		if current_pos != _last_drag_pos:
@@ -346,6 +368,13 @@ func _build_hud() -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hud_hbox.add_child(spacer)
 
+	_timer_label = Label.new()
+	_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
+	_timer_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_timer_label.custom_minimum_size = Vector2(0, HUD_H)
+	_hud_hbox.add_child(_timer_label)
+
 	_counter_label = Label.new()
 	_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
 	_counter_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
@@ -403,6 +432,10 @@ func _on_layout_changed() -> void:
 	if _counter_label != null:
 		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
 		_counter_label.custom_minimum_size = Vector2(0, HUD_H)
+
+	if _timer_label != null:
+		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
+		_timer_label.custom_minimum_size = Vector2(0, HUD_H)
 
 	var portrait := UIScale.is_portrait()
 	var padding_v := UIScale.px(12.0 if portrait else 8.0)
@@ -1025,6 +1058,13 @@ func _build_complete_overlay() -> void:
 	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(sub_lbl)
 
+	_complete_time_lbl = Label.new()
+	_complete_time_lbl.text = ""
+	_complete_time_lbl.add_theme_font_size_override("font_size", UIScale.font_size(22))
+	_complete_time_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	_complete_time_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_complete_time_lbl)
+
 	var btn_row := HBoxContainer.new()
 	btn_row.add_theme_constant_override("separation", 14)
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1152,6 +1192,10 @@ func _build_puzzle() -> void:
 	_total_pieces  = piece_data_array.size()
 	_placed_pieces = 0
 	_update_counter()
+	_timer_elapsed = 0.0
+	_timer_last_s  = -1
+	_timer_running = true
+	_update_timer_label()
 
 	# Resolve the shape enum value from the string key.
 	var shape_enum: int = PuzzleGeneratorScript.PieceShape.JIGSAW
@@ -1272,6 +1316,23 @@ func _update_counter() -> void:
 		_counter_label.text = "Pieces: %d / %d" % [_placed_pieces, _total_pieces]
 
 
+## Formats elapsed seconds as M:SS or H:MM:SS and refreshes the HUD timer label.
+func _update_timer_label() -> void:
+	if _timer_label != null:
+		_timer_label.text = _format_time(_timer_elapsed)
+
+
+## Converts a duration in seconds to a human-readable "M:SS" or "H:MM:SS" string.
+func _format_time(seconds: float) -> String:
+	var total_s: int = int(seconds)
+	var h: int = total_s / 3600
+	var m: int = (total_s % 3600) / 60
+	var s: int = total_s % 60
+	if h > 0:
+		return "%d:%02d:%02d" % [h, m, s]
+	return "%d:%02d" % [m, s]
+
+
 ## Called by each PuzzlePiece when it snaps into place.
 func on_piece_placed() -> void:
 	_placed_pieces += 1
@@ -1315,6 +1376,10 @@ func _on_piece_released() -> void:
 ##   3. Confetti rain begins (3.5 s spawn window).
 ##   4. Puzzle glow + piece celebration wave play on the board behind the card.
 func _show_complete() -> void:
+	_timer_running = false
+	_update_timer_label()
+	if _complete_time_lbl != null:
+		_complete_time_lbl.text = "Time: %s" % _format_time(_timer_elapsed)
 	# Dismiss the zoom overlay so it does not cover the completion card.
 	if _zoom_overlay != null:
 		_zoom_overlay.visible = false
@@ -1584,6 +1649,7 @@ func _generate_completion_sound() -> AudioStreamWAV:
 
 ## Returns to the main menu.
 func _on_back_pressed() -> void:
+	_timer_running = false
 	if _music_player != null:
 		_music_player.stop()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
@@ -1617,6 +1683,10 @@ func _on_restart_puzzle() -> void:
 
 	_placed_pieces = 0
 	_update_counter()
+	_timer_elapsed = 0.0
+	_timer_last_s  = -1
+	_timer_running = true
+	_update_timer_label()
 
 	for i in range(_pieces.size()):
 		var piece = _pieces[i]
@@ -1663,6 +1733,10 @@ func _on_new_puzzle() -> void:
 	_placed_pieces = 0
 	_total_pieces  = 0
 	_update_counter()
+	_timer_elapsed = 0.0
+	_timer_last_s  = -1
+	_timer_running = false
+	_update_timer_label()
 
 	# Wait one frame so queue_free calls have resolved before rebuilding.
 	await get_tree().process_frame
