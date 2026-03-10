@@ -179,12 +179,13 @@ func _play_snap_animation() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite == null:
 		return
+	var base_scale: Vector2 = sprite.scale
 	var tween := create_tween()
 	# Phase 1: scale up and flash to gold (0.10 s), both properties in parallel.
-	tween.tween_property(sprite, "scale", Vector2(1.22, 1.22), 0.10)
+	tween.tween_property(sprite, "scale", base_scale * 1.22, 0.10)
 	tween.parallel().tween_property(sprite, "modulate", Color(1.5, 1.3, 0.3, 1.0), 0.10)
 	# Phase 2: spring back to normal (0.20 s) with an elastic overshoot for a
 	# satisfying snap feel; colour fade runs in parallel.
-	tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.20) \
+	tween.tween_property(sprite, "scale", base_scale, 0.20) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
 	tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.20)
