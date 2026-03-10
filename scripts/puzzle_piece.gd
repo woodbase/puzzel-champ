@@ -96,6 +96,7 @@ func _end_drag() -> void:
 	if distance < snap_distance:
 		global_position = correct_global
 		is_locked = true
+		input_pickable = false
 		if GameState.feedback_haptic:
 			Input.vibrate_handheld(50)
 		if GameState.feedback_visual:
