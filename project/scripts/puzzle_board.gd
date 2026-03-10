@@ -72,19 +72,39 @@ func setup_puzzle(
 
 	var textures: Array[ImageTexture] = PuzzleGeneratorScript.generate_pieces(texture, cols_rows, piece_shape)
 
+	# For jigsaw pieces, compute the screen-space padding that create_piece_texture
+	# added so that OUT-tabs are not clipped.  This padding must be subtracted from
+	# each piece's snap position (and added to its display size) so that the cell
+	# content is rendered at the correct grid location.
+	var screen_padding := Vector2.ZERO
+	if piece_shape == PuzzleGeneratorScript.PieceShape.JIGSAW:
+		var image_piece_w := int(img_w) / cols_rows
+		var image_piece_h := int(img_h) / cols_rows
+		var image_tab_depth := float(min(image_piece_w, image_piece_h)) * PuzzleGeneratorScript.TAB_DEPTH_RATIO
+		var image_padding := int(ceil(image_tab_depth * PuzzleGeneratorScript.TAB_HEAD_BULGE))
+		screen_padding = Vector2(
+			float(image_padding) * _piece_size.x / float(max(image_piece_w, 1)),
+			float(image_padding) * _piece_size.y / float(max(image_piece_h, 1))
+		)
+
+	# Display size of each piece control, including the surrounding padding area.
+	var display_size := _piece_size + 2.0 * screen_padding
+
 	for i in range(textures.size()):
 		var col := i % cols_rows
 		var row := i / cols_rows
-		var correct_pos := _puzzle_offset + Vector2(col * _piece_size.x, row * _piece_size.y)
+		# Offset the snap position by the padding so the cell content aligns
+		# with the guide grid once the piece snaps into place.
+		var correct_pos := _puzzle_offset + Vector2(col * _piece_size.x, row * _piece_size.y) - screen_padding
 
 		var piece: Control = PIECE_SCENE.instantiate()
 		add_child(piece)
-		piece.setup(textures[i], Vector2i(col, row), correct_pos, _piece_size, allow_rotation)
+		piece.setup(textures[i], Vector2i(col, row), correct_pos, display_size, allow_rotation)
 		piece.feedback_visual = feedback_visual
 		piece.feedback_haptic = feedback_haptic
 		piece.position = Vector2(
-			randf_range(0.0, board_size.x - _piece_size.x),
-			randf_range(0.0, board_size.y - _piece_size.y)
+			randf_range(0.0, maxf(0.0, board_size.x - display_size.x)),
+			randf_range(0.0, maxf(0.0, board_size.y - display_size.y))
 		)
 		piece.piece_placed.connect(_on_piece_placed)
 		piece.piece_picked_up.connect(_on_piece_picked_up)

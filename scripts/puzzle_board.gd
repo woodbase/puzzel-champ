@@ -792,6 +792,14 @@ func _build_puzzle() -> void:
 	# Base piece size in image-space (square cells, uses the smaller dimension).
 	var image_piece_size: int = min(img_w / cols, img_h / rows)
 
+	# Resize the image to be exactly cols × image_piece_size wide and
+	# rows × image_piece_size tall so that integer-division truncation cannot
+	# leave a gap at the right or bottom edge of the assembled puzzle.
+	var target_img_w: int = cols * image_piece_size
+	var target_img_h: int = rows * image_piece_size
+	if image.get_width() != target_img_w or image.get_height() != target_img_h:
+		image.resize(target_img_w, target_img_h, Image.INTERPOLATE_LANCZOS)
+
 	var viewport_size := get_viewport_rect().size
 
 	# Scale the puzzle to fill 90 % of the available area below the HUD bar.
