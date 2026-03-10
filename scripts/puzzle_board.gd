@@ -74,6 +74,11 @@ var _puzzle_origin: Vector2 = Vector2.ZERO
 ## The piece currently being dragged, or null when nothing is held.
 var _dragged_piece = null
 
+## Last recorded global position of the dragged piece.
+## Used to skip queue_redraw() calls when the piece has not moved, avoiding
+## redundant canvas redraws every frame while the player holds a piece still.
+var _last_drag_pos: Vector2 = Vector2.ZERO
+
 ## All puzzle pieces created during the last _build_puzzle() call.
 ## Kept so the board entry animation can target each piece individually.
 var _pieces: Array = []
@@ -182,7 +187,10 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if _dragged_piece != null and GameState.feedback_visual:
-		queue_redraw()
+		var current_pos: Vector2 = _dragged_piece.global_position
+		if current_pos != _last_drag_pos:
+			_last_drag_pos = current_pos
+			queue_redraw()
 
 
 ## Draws a highlight rectangle at the target position of the dragged piece when
@@ -993,6 +1001,7 @@ func on_piece_placed() -> void:
 ## Called by each PuzzlePiece when the player picks it up.
 func on_piece_picked_up(piece) -> void:
 	_dragged_piece = piece
+	_last_drag_pos = piece.global_position
 	if GameState.feedback_audio and _pickup_player != null:
 		_pickup_player.play()
 
@@ -1000,6 +1009,7 @@ func on_piece_picked_up(piece) -> void:
 ## Called by each PuzzlePiece when the player releases it (placed or dropped).
 func _on_piece_released() -> void:
 	_dragged_piece = null
+	_last_drag_pos = Vector2.ZERO
 	queue_redraw()
 
 
