@@ -169,33 +169,60 @@ func _load_user_gallery_textures() -> void:
 			_gallery_paths.append(path)
 
 
-## Copies an image file into user://gallery/ and returns the user:// path.
+## Copies a (possibly resized) image into user://gallery/ and returns the path.
 ## Returns "" on failure.  A unique filename is chosen if one already exists.
-func _save_user_image(src_path: String) -> String:
+func _save_user_image(src_path: String, img: Image) -> String:
 	# Ensure the directory exists.
 	var abs_dir := ProjectSettings.globalize_path(USER_GALLERY_DIR)
 	if not DirAccess.dir_exists_absolute(abs_dir):
 		DirAccess.make_dir_recursive_absolute(abs_dir)
 
-	var filename := src_path.get_file()
-	var dest_path := USER_GALLERY_DIR + filename
-	# Avoid overwriting an existing file.
+	var base_name := src_path.get_file().get_basename()
+	var ext := src_path.get_extension().to_lower()
+	if ext == "":
+		ext = "png"
+
+	var dest_path := _unique_user_gallery_path(base_name, ext)
+	if _save_image_with_extension(img, dest_path, ext):
+		return dest_path
+
+	if ext != "png":
+		dest_path = _unique_user_gallery_path(base_name, "png")
+		if _save_image_with_extension(img, dest_path, "png"):
+			return dest_path
+
+	return ""
+
+
+## Returns a unique user://gallery/ path using *base_name* and *ext*.
+func _unique_user_gallery_path(base_name: String, ext: String) -> String:
+	var use_ext := ext if ext != "" else "png"
+	var dest_path := USER_GALLERY_DIR + "%s.%s" % [base_name, use_ext]
 	var counter := 1
 	while FileAccess.file_exists(dest_path):
-		dest_path = USER_GALLERY_DIR + "%s_%d.%s" % [
-			filename.get_basename(), counter, filename.get_extension()
-		]
+		dest_path = USER_GALLERY_DIR + "%s_%d.%s" % [base_name, counter, use_ext]
 		counter += 1
-
-	var data := FileAccess.get_file_as_bytes(src_path)
-	if data.is_empty():
-		return ""
-	var f := FileAccess.open(dest_path, FileAccess.WRITE)
-	if f == null:
-		return ""
-	f.store_buffer(data)
-	f.close()
 	return dest_path
+
+
+## Saves *img* to *dest_path* using the requested extension. Returns false on failure.
+func _save_image_with_extension(img: Image, dest_path: String, ext: String) -> bool:
+	var abs_dest := ProjectSettings.globalize_path(dest_path)
+	var err: int = ERR_FILE_UNAVAILABLE
+	match ext:
+		"png":
+			err = img.save_png(abs_dest)
+		"jpg", "jpeg":
+			err = img.save_jpg(abs_dest, 0.9)
+		"bmp":
+			err = img.save_bmp(abs_dest)
+		"tga":
+			err = img.save_tga(abs_dest)
+		"webp":
+			err = img.save_webp(abs_dest)
+		_:
+			return false
+	return err == OK
 
 
 ## Returns a THUMBNAIL_SIZE × THUMBNAIL_SIZE ImageTexture scaled from *img*.
@@ -683,11 +710,11 @@ func _on_file_selected(path: String) -> void:
 		_show_error("Could not load the selected image.\nPlease choose a valid PNG, JPG, BMP, or WebP file.")
 		return
 
+	_limit_image_size(img)
 	# Save the image to user://gallery/ so it is available in future sessions.
-	var saved_path := _save_user_image(path)
+	var saved_path := _save_user_image(path, img)
 	var use_path := saved_path if saved_path != "" else path
 
-	_limit_image_size(img)
 	var tex := ImageTexture.create_from_image(img)
 	_gallery_textures.append(tex)
 	_gallery_thumb_textures.append(_make_thumbnail(img))
