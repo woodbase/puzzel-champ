@@ -47,6 +47,10 @@ var _counter_label: Label = null
 ## Fullscreen overlay shown when the puzzle is complete.
 var _complete_overlay: Control = null
 
+## The completion card panel inside _complete_overlay.
+## Stored so the card entrance animation can target it.
+var _complete_card: Control = null
+
 ## Confetti particle effect shown on puzzle completion.
 var _confetti: Object = null
 
@@ -661,9 +665,10 @@ func _build_complete_overlay() -> void:
 	_complete_overlay.visible = false
 	_hud.add_child(_complete_overlay)
 
-	# Dimmed backdrop.
+	# Dimmed backdrop – starts fully transparent; fades in when shown.
 	var dim := ColorRect.new()
 	dim.color = Color(0.0, 0.0, 0.0, 0.65)
+	dim.modulate.a = 0.0
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_complete_overlay.add_child(dim)
 
@@ -685,7 +690,12 @@ func _build_complete_overlay() -> void:
 	ps.border_width_bottom = 2
 	ps.border_color = Color(0.55, 0.35, 0.90)
 	card.add_theme_stylebox_override("panel", ps)
+	# Card starts scaled down and transparent so the entrance animation can
+	# spring it into view.
+	card.scale = Vector2(0.80, 0.80)
+	card.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	center.add_child(card)
+	_complete_card = card
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left",   48)
@@ -967,11 +977,45 @@ func _on_piece_released() -> void:
 	queue_redraw()
 
 
-## Displays the completion overlay, plays the completion fanfare, and launches
-## the confetti victory effect.
+## Displays the completion overlay with an entrance animation, plays the
+## completion fanfare, and launches the confetti victory effect.
+##
+## Victory animation sequence:
+##   1. Backdrop fades in (0.25 s, alpha 0 → 0.65)
+##   2. Card scales up from 0.8× to 1.0× with an elastic overshoot (0.35 s,
+##      ease-out back) and simultaneously fades in from transparent to opaque.
+##   3. Confetti rain begins (3.5 s spawn window).
+##   4. Puzzle glow + piece celebration wave play on the board behind the card.
 func _show_complete() -> void:
 	if _complete_overlay != null:
 		_complete_overlay.visible = true
+
+		# Animate backdrop and card entrance when visual feedback is on.
+		if GameState.feedback_visual:
+			# Find the dim backdrop (first child of _complete_overlay).
+			var dim := _complete_overlay.get_child(0) as ColorRect
+			if dim != null:
+				var dim_tween := create_tween()
+				dim_tween.tween_property(dim, "modulate:a", 1.0, 0.25) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+			# Scale + fade the card with a short delay so the backdrop appears first.
+			if _complete_card != null:
+				var card_tween := create_tween()
+				card_tween.tween_interval(0.10)
+				card_tween.tween_property(_complete_card, "scale", Vector2.ONE, 0.35) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+				card_tween.parallel().tween_property(_complete_card, "modulate:a", 1.0, 0.25) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		else:
+			# Instant show when visual feedback is disabled.
+			var dim := _complete_overlay.get_child(0) as ColorRect
+			if dim != null:
+				dim.modulate.a = 1.0
+			if _complete_card != null:
+				_complete_card.scale = Vector2.ONE
+				_complete_card.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
 	if GameState.feedback_audio and _complete_player != null:
 		_complete_player.play()
 	if GameState.feedback_visual and _confetti != null:
@@ -982,7 +1026,7 @@ func _show_complete() -> void:
 		_play_piece_celebration_wave()
 
 
-## Prototype: Piece Celebration Wave
+## Piece Celebration Wave
 ## Triggers a brief cascade of scale-bounce + gold-flash animations through all
 ## locked pieces, staggered by their grid distance from the top-left corner.
 ## Each piece bounces ~0.06 s after the piece diagonally before it, producing a
