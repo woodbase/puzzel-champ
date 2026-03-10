@@ -54,6 +54,15 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			# Consume the event so overlapping pieces don't also start dragging,
 			# which could cause the wrong piece to snap into an incorrect position.
 			get_viewport().set_input_as_handled()
+	elif event is InputEventScreenTouch:
+		# Explicit touch handling for mobile devices.  Even when
+		# emulate_mouse_from_touch is on both the ScreenTouch and the
+		# synthesised MouseButton will fire; _start_drag guards against
+		# double-invocation so only the first call takes effect.
+		var touch_event := event as InputEventScreenTouch
+		if touch_event.pressed:
+			_start_drag(touch_event.position)
+			get_viewport().set_input_as_handled()
 
 
 func _input(event: InputEvent) -> void:
@@ -63,14 +72,27 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		_update_drag(get_global_mouse_position())
 
+	elif event is InputEventScreenDrag:
+		# Keep the piece following the finger while it moves.
+		_update_drag((event as InputEventScreenDrag).position)
+
 	elif event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and not mouse_event.pressed:
 			_end_drag()
 
+	elif event is InputEventScreenTouch:
+		# Finger lifted – end the drag.  _end_drag guards against the
+		# matching MouseButton release that emulate_mouse_from_touch also fires.
+		var touch_event := event as InputEventScreenTouch
+		if not touch_event.pressed:
+			_end_drag()
+
 
 ## Begins dragging the piece.
 func _start_drag(mouse_pos: Vector2) -> void:
+	if _dragging:
+		return  # Guard: ignore if already dragging (e.g. touch + emulated mouse).
 	_dragging = true
 	_drag_offset = global_position - mouse_pos
 	_original_z_index = z_index
@@ -85,6 +107,8 @@ func _update_drag(mouse_pos: Vector2) -> void:
 
 ## Ends dragging; snaps and locks the piece if close enough to its target.
 func _end_drag() -> void:
+	if not _dragging:
+		return  # Guard: ignore if not dragging (e.g. both ScreenTouch + emulated MouseButton fire).
 	_dragging = false
 	z_index = _original_z_index
 
