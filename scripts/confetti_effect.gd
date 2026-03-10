@@ -16,17 +16,18 @@ const COLOURS: Array = [
 ]
 
 ## How long (seconds) new particles are spawned after start() is called.
-const SPAWN_DURATION: float = 3.5
+const SPAWN_DURATION: float = 4.0
 
 ## Particles spawned per second during the spawn window.
-const SPAWN_RATE: float = 55.0
+## Increased for more festive effect.
+const SPAWN_RATE: float = 70.0
 
 ## Downward acceleration applied to every particle (pixels/s²).
-const GRAVITY: float = 260.0
+const GRAVITY: float = 280.0
 
 ## Per-frame horizontal drag coefficient (applied once per frame).
 ## Assumes ~60 fps; for a visual effect this approximation is acceptable.
-const DRAG: float = 0.97
+const DRAG: float = 0.98
 
 ## Extra pixels below the bottom edge before a particle is culled.
 const CULL_BUFFER: float = 80.0
@@ -99,13 +100,17 @@ func _process(delta: float) -> void:
 
 func _spawn_particle() -> void:
 	var p := Particle.new()
-	p.pos         = Vector2(randf() * _screen_size.x, randf_range(-40.0, -5.0))
-	p.vel         = Vector2(randf_range(-55.0, 55.0), randf_range(70.0, 190.0))
+	# Spawn across full width with varied starting heights for depth.
+	p.pos         = Vector2(randf() * _screen_size.x, randf_range(-60.0, -10.0))
+	# More varied velocities for dynamic motion.
+	p.vel         = Vector2(randf_range(-70.0, 70.0), randf_range(80.0, 220.0))
 	p.angle       = randf() * TAU
-	p.spin        = randf_range(-6.0, 6.0)
+	# Faster spin rates for more energy.
+	p.spin        = randf_range(-8.0, 8.0)
 	p.color_index = randi() % COLOURS.size()
-	p.w           = randf_range(7.0, 14.0)
-	p.h           = randf_range(4.0,  8.0)
+	# Varied sizes for visual interest.
+	p.w           = randf_range(6.0, 16.0)
+	p.h           = randf_range(3.5, 9.0)
 	_particles.append(p)
 
 
