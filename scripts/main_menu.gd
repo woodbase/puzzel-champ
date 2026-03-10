@@ -98,6 +98,13 @@ func _ready() -> void:
 		_apply_difficulty(_find_difficulty_index(GameState.cols, GameState.rows))
 	else:
 		_apply_difficulty(_default_difficulty_for_screen())
+	if GameState.image_texture == null and UIScale.is_mobile():
+		# Fresh start on a mobile device: default to Easy for comfortable play.
+		_apply_difficulty(0)
+	else:
+		_apply_difficulty(
+			_find_difficulty_index(GameState.cols, GameState.rows)
+		)
 
 	_apply_shape(
 		_find_shape_index(GameState.piece_shape)
