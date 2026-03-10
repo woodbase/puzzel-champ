@@ -19,7 +19,7 @@ func _ready():
 	# so the sequence is genuinely "fade in from black, fade out to black"
 	splash_image.modulate.a = 0.0
 
-	# ── Prototype: Logo / splash animation ─────────────────────────────────────
+	# ── Logo / splash animation ──────────────────────────────────────────────
 	# A branded title and tagline animate in on the dark background before the
 	# splash image reveals itself, giving the intro a polished "logo build-up"
 	# feel.  All elements then fade out in unison before the scene changes.

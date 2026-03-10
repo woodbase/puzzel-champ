@@ -21,7 +21,7 @@ const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 ## Confetti celebration effect played on puzzle completion.
 const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
-## Prototype: puzzle border glow effect played on puzzle completion.
+## Puzzle border glow effect played on puzzle completion.
 const PuzzleGlowEffect = preload("res://scripts/puzzle_glow_effect.gd")
 ## Main menu script – used as the single source of difficulty presets so that
 ## puzzle_board.gd stays in sync with main_menu.gd without duplicating data.
@@ -47,10 +47,14 @@ var _counter_label: Label = null
 ## Fullscreen overlay shown when the puzzle is complete.
 var _complete_overlay: Control = null
 
+## The completion card panel inside _complete_overlay.
+## Stored so the card entrance animation can target it.
+var _complete_card: Control = null
+
 ## Confetti particle effect shown on puzzle completion.
 var _confetti: Object = null
 
-## Prototype: pulsing border glow shown around the puzzle on completion.
+## Pulsing border glow shown around the puzzle on completion.
 var _glow_effect: Object = null
 
 ## Guard flag: prevents overlapping rebuild calls.
@@ -661,9 +665,10 @@ func _build_complete_overlay() -> void:
 	_complete_overlay.visible = false
 	_hud.add_child(_complete_overlay)
 
-	# Dimmed backdrop.
+	# Dimmed backdrop – starts fully transparent; fades in when shown.
 	var dim := ColorRect.new()
 	dim.color = Color(0.0, 0.0, 0.0, 0.65)
+	dim.modulate.a = 0.0
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_complete_overlay.add_child(dim)
 
@@ -685,7 +690,12 @@ func _build_complete_overlay() -> void:
 	ps.border_width_bottom = 2
 	ps.border_color = Color(0.55, 0.35, 0.90)
 	card.add_theme_stylebox_override("panel", ps)
+	# Card starts scaled down and transparent so the entrance animation can
+	# spring it into view.
+	card.scale = Vector2(0.80, 0.80)
+	card.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	center.add_child(card)
+	_complete_card = card
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left",   48)
@@ -729,7 +739,7 @@ func _build_complete_overlay() -> void:
 	_confetti = ConfettiEffect.new()
 	_hud.add_child(_confetti)
 
-	# Prototype: glow effect lives on the board's own coordinate space so it
+	# Glow effect lives on the board's own coordinate space so it
 	# aligns with the puzzle grid.  Added to the board (not the HUD) so that
 	# draw_rect coordinates match piece local positions.
 	_glow_effect = PuzzleGlowEffect.new()
@@ -888,14 +898,14 @@ func _build_puzzle() -> void:
 
 ## Plays the board entry animation after each puzzle build.
 ##
-## Two loading-animation prototypes run simultaneously:
+## Two loading animations run simultaneously:
 ##
-##   Prototype A – Puzzle image fade-in
+##   Layer A – Puzzle image fade-in
 ##     A full-screen dark overlay is placed on top of the freshly-built board
 ##     and fades to transparent over ~0.55 s, creating the impression of the
 ##     scattered pieces being gradually revealed from darkness.
 ##
-##   Prototype B – Puzzle pieces assembling
+##   Layer B – Puzzle pieces assembling
 ##     Each piece starts at scale Vector2.ZERO and springs open to its normal
 ##     size using an elastic ease with a 30 ms stagger between pieces.  The
 ##     stagger makes the board feel like it's populating piece-by-piece rather
@@ -904,7 +914,7 @@ func _animate_board_entry() -> void:
 	if _pieces.is_empty():
 		return
 
-	# ── Prototype A: Puzzle image fade-in ──────────────────────────────────────
+	# ── Layer A: Puzzle image fade-in ──────────────────────────────────────────
 	# Clean up any leftover overlay from a previous build before adding a new
 	# one (can happen when "New Puzzle" is pressed during the animation).
 	if is_instance_valid(_entry_overlay):
@@ -924,7 +934,7 @@ func _animate_board_entry() -> void:
 			_entry_overlay = null
 	)
 
-	# ── Prototype B: Puzzle pieces assembling ──────────────────────────────────
+	# ── Layer B: Puzzle pieces assembling ──────────────────────────────────────
 	for i in _pieces.size():
 		var piece = _pieces[i]
 		if not is_instance_valid(piece):
@@ -967,11 +977,45 @@ func _on_piece_released() -> void:
 	queue_redraw()
 
 
-## Displays the completion overlay, plays the completion fanfare, and launches
-## the confetti victory effect.
+## Displays the completion overlay with an entrance animation, plays the
+## completion fanfare, and launches the confetti victory effect.
+##
+## Victory animation sequence:
+##   1. Backdrop fades in (0.25 s, alpha 0 → 0.65)
+##   2. Card scales up from 0.8× to 1.0× with an elastic overshoot (0.35 s,
+##      ease-out back) and simultaneously fades in from transparent to opaque.
+##   3. Confetti rain begins (3.5 s spawn window).
+##   4. Puzzle glow + piece celebration wave play on the board behind the card.
 func _show_complete() -> void:
 	if _complete_overlay != null:
 		_complete_overlay.visible = true
+
+		# Animate backdrop and card entrance when visual feedback is on.
+		if GameState.feedback_visual:
+			# Find the dim backdrop (first child of _complete_overlay).
+			var dim := _complete_overlay.get_child(0) as ColorRect
+			if dim != null:
+				var dim_tween := create_tween()
+				dim_tween.tween_property(dim, "modulate:a", 1.0, 0.25) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+
+			# Scale + fade the card with a short delay so the backdrop appears first.
+			if _complete_card != null:
+				var card_tween := create_tween()
+				card_tween.tween_interval(0.10)
+				card_tween.tween_property(_complete_card, "scale", Vector2.ONE, 0.35) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+				card_tween.parallel().tween_property(_complete_card, "modulate:a", 1.0, 0.25) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		else:
+			# Instant show when visual feedback is disabled.
+			var dim := _complete_overlay.get_child(0) as ColorRect
+			if dim != null:
+				dim.modulate.a = 1.0
+			if _complete_card != null:
+				_complete_card.scale = Vector2.ONE
+				_complete_card.modulate = Color(1.0, 1.0, 1.0, 1.0)
+
 	if GameState.feedback_audio and _complete_player != null:
 		_complete_player.play()
 	if GameState.feedback_visual and _confetti != null:
@@ -982,7 +1026,7 @@ func _show_complete() -> void:
 		_play_piece_celebration_wave()
 
 
-## Prototype: Piece Celebration Wave
+## Piece Celebration Wave
 ## Triggers a brief cascade of scale-bounce + gold-flash animations through all
 ## locked pieces, staggered by their grid distance from the top-left corner.
 ## Each piece bounces ~0.06 s after the piece diagonally before it, producing a
