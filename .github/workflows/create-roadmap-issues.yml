@@ -343,6 +343,37 @@ jobs:
                 milestone: "Long-Term Improvements (Post-Release)",
                 title: "Support custom puzzle uploads",
                 body: "Allow players to upload their own custom images to use as puzzles.\n\n**Acceptance Criteria:**\n- Players can upload a custom image from their device\n- Uploaded images are stored for later use\n- Custom images can be selected from the gallery\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              // New issues from project plan
+              {
+                milestone: "Milestone 1 – Core Gameplay Stabilization",
+                title: "Fix image alignment in puzzle board",
+                labels: ["bug"],
+                body: "The puzzle image does not align correctly within the puzzle board. Pieces may appear offset or misaligned relative to the expected target positions.\n\n**Acceptance Criteria:**\n- The puzzle image is correctly aligned with the piece grid\n- No visible offset or misalignment at any supported resolution\n- Fix is verified on both desktop and mobile\n\n**Milestone:** Core Gameplay Stabilization"
+              },
+              {
+                milestone: "Milestone 9 – Release Preparation",
+                title: "Fix splash screen not fitting the display",
+                labels: ["bug"],
+                body: "The splash screen does not fit the display correctly. It may be cropped, letterboxed, or otherwise not filling the screen as intended.\n\n**Acceptance Criteria:**\n- Splash screen fills the full display on all supported screen sizes\n- No cropping or unwanted letterboxing\n- Fix is verified on both desktop and mobile resolutions\n\n**Milestone:** Release Preparation"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Add ability to save progress",
+                labels: ["enhancement"],
+                body: "Allow players to save their in-progress puzzle and resume it later, so they do not have to complete a puzzle in one sitting.\n\n**Acceptance Criteria:**\n- Player can save the current puzzle state at any time\n- Saved progress persists across game sessions\n- Player can resume a saved puzzle from where they left off\n- Save slot is clearly indicated in the UI\n\n**Milestone:** Long-Term Improvements (Post-Release)"
+              },
+              {
+                milestone: "Milestone 5 – Visual Effects and Feedback",
+                title: "Add rounded shapes on puzzle pieces",
+                labels: ["enhancement"],
+                body: "Add support for rounded or soft-edged shapes on puzzle pieces to improve visual appeal and distinguish them from plain square cuts.\n\n**Acceptance Criteria:**\n- Puzzle pieces render with rounded edges as an available style option\n- Rounded style looks consistent across all piece sizes and difficulty levels\n- Existing piece shapes (square, jigsaw) are unaffected\n\n**Milestone:** Visual Effects and Feedback"
+              },
+              {
+                milestone: "Long-Term Improvements (Post-Release)",
+                title: "Support irregular piece shapes so not all pieces look the same",
+                labels: ["enhancement"],
+                body: "Add support for irregular piece shapes so that not all pieces share the same silhouette. This increases the visual variety and makes the puzzle feel more authentic.\n\n**Acceptance Criteria:**\n- Pieces are generated with varied, irregular outlines\n- All pieces still tile together correctly with no gaps or overlaps\n- Feature can be toggled or is available as a separate shape option\n\n**Milestone:** Long-Term Improvements (Post-Release)"
               }
             ];
 
@@ -377,12 +408,16 @@ jobs:
                 console.error(`No milestone number found for "${issue.milestone}" – skipping issue: ${issue.title}`);
                 continue;
               }
-              await github.rest.issues.create({
+              const createParams = {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: issue.title,
                 body: issue.body,
                 milestone: milestoneNumber
-              });
+              };
+              if (issue.labels && issue.labels.length > 0) {
+                createParams.labels = issue.labels;
+              }
+              await github.rest.issues.create(createParams);
               console.log(`Created issue: ${issue.title}`);
             }
