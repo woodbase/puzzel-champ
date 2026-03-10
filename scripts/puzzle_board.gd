@@ -77,6 +77,10 @@ const HIGHLIGHT_DISTANCE: float = 60.0
 ## Kept so the board entry animation can target each piece individually.
 var _pieces: Array = []
 
+## Initial spawn positions recorded for each piece during _build_puzzle().
+## Used by _on_restart_puzzle() to return pieces to their starting positions.
+var _pieces_initial_positions: Array[Vector2] = []
+
 ## Full-screen dark overlay used for the puzzle-image fade-in animation.
 ## Freed automatically once the fade-out completes.
 var _entry_overlay: ColorRect = null
@@ -225,7 +229,7 @@ func _build_hud() -> void:
 	_hud_buttons.append(back_btn)
 
 	var restart_btn := _make_hud_button("Restart")
-	restart_btn.pressed.connect(_on_new_puzzle)
+	restart_btn.pressed.connect(_on_restart_puzzle)
 	restart_btn.tooltip_text = "Restart this puzzle"
 	_hud_hbox.add_child(restart_btn)
 	_hud_buttons.append(restart_btn)
@@ -819,6 +823,7 @@ func _build_puzzle() -> void:
 		shape_enum = PuzzleGeneratorScript.PieceShape.SQUARE
 
 	_pieces.clear()
+	_pieces_initial_positions.clear()
 
 	for pd in piece_data_array:
 		var col: int = pd.grid_pos.x
@@ -851,12 +856,14 @@ func _build_puzzle() -> void:
 
 		piece.correct_position = correct_pos
 
-		# Spawn randomly below the HUD bar.
-		var half: float = screen_piece_size * 0.5
-		piece.position = Vector2(
+		# Spawn randomly; keep pieces below the HUD bar.
+		var half := piece_size * 0.5
+		var spawn_pos := Vector2(
 			randf_range(half, viewport_size.x - half),
 			randf_range(HUD_H + half, viewport_size.y - half)
 		)
+		piece.position = spawn_pos
+		_pieces_initial_positions.append(spawn_pos)
 		piece.piece_placed.connect(on_piece_placed)
 		piece.piece_picked_up.connect(on_piece_picked_up.bind(piece))
 		piece.piece_released.connect(_on_piece_released)
@@ -1194,6 +1201,43 @@ func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
+## Resets all pieces to their initial positions without rebuilding the puzzle.
+## Pieces are returned to their starting locations and their locked state is
+## cleared so the puzzle can be solved again from the beginning.
+func _on_restart_puzzle() -> void:
+	if _building:
+		return
+
+	if _complete_overlay != null:
+		_complete_overlay.visible = false
+
+	if _confetti != null:
+		_confetti.stop()
+
+	if _complete_player != null:
+		_complete_player.stop()
+
+	# Dismiss any in-progress entry overlay immediately.
+	if is_instance_valid(_entry_overlay):
+		_entry_overlay.queue_free()
+		_entry_overlay = null
+
+	_placed_pieces = 0
+	_update_counter()
+
+	for i in range(_pieces.size()):
+		var piece = _pieces[i]
+		if not is_instance_valid(piece):
+			continue
+		piece.is_locked = false
+		piece.input_pickable = true
+		piece.z_index = 0
+		if i < _pieces_initial_positions.size():
+			piece.position = _pieces_initial_positions[i]
+		else:
+			push_warning("PuzzleBoard: _pieces_initial_positions out of sync at index %d" % i)
+
+
 ## Clears all pieces and rebuilds the puzzle with the same image.
 func _on_new_puzzle() -> void:
 	if _building:
@@ -1217,6 +1261,7 @@ func _on_new_puzzle() -> void:
 	for piece in get_tree().get_nodes_in_group("puzzle_pieces"):
 		piece.queue_free()
 	_pieces.clear()
+	_pieces_initial_positions.clear()
 
 	_placed_pieces = 0
 	_total_pieces  = 0
