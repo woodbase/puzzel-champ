@@ -122,6 +122,11 @@ var _hud_hbox: HBoxContainer = null
 ## refreshed when the layout changes.
 var _hud_buttons: Array[Button] = []
 
+## Tracks the portrait/landscape state from the last layout update.
+## Used to detect orientation flips and trigger a puzzle rebuild so pieces
+## always fit the newly-rotated screen.
+var _last_portrait: bool = false
+
 ## Base volume_db values for each AudioStreamPlayer (before volume scaling).
 const PICKUP_BASE_DB: float = -10.0
 const SNAP_BASE_DB: float = -6.0
@@ -141,6 +146,7 @@ const PIECE_STAGGER_DELAY: float = 0.03
 func _ready() -> void:
 	# Set HUD bar height based on orientation and screen scale.
 	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+	_last_portrait = UIScale.is_portrait()
 
 	_generator = PuzzleGeneratorScript.new()
 	_pickup_player = _create_pickup_audio_player()
@@ -334,16 +340,28 @@ func _on_layout_changed() -> void:
 	# No manual repositioning is needed since _preview_panel uses anchor values of
 	# (1,1,1,1) which automatically track the viewport's bottom-right corner.
 
+	# Rebuild the puzzle when the device orientation flips (portrait ↔ landscape)
+	# so that all piece positions and the grid layout fit the new screen dimensions.
+	if portrait != _last_portrait:
+		_last_portrait = portrait
+		if not _pieces.is_empty() and not _building:
+			_on_new_puzzle()
+
 
 ## Returns the pixel height the settings/menu panel should have.
+## Caps at the available viewport height below the HUD so the panel never
+## overflows the screen (important on small landscape phone screens).
 func _settings_panel_height() -> int:
-	# 390 px accommodates difficulty row + settings toggles + divider on desktop.
-	return 390
+	var vp_h := int(get_viewport().get_visible_rect().size.y)
+	# 390 px is the natural content height; cap to fit on small screens.
+	return mini(390, vp_h - int(HUD_H) - 8)
 
 
 ## Builds a floating game-menu panel anchored below the HUD bar.
 ## The panel includes: difficulty selector, audio/visual settings toggles,
 ## and a volume slider – serving as the game's in-play menu.
+## A ScrollContainer is used so all items remain reachable on small screens
+## (e.g. a phone in landscape where the panel height is viewport-constrained).
 func _build_settings_panel() -> void:
 	var panel := PanelContainer.new()
 	var ps := StyleBoxFlat.new()
@@ -369,15 +387,23 @@ func _build_settings_panel() -> void:
 	panel.visible = false
 	_hud.add_child(panel)
 
+	# Scroll container so all settings remain reachable when the panel is
+	# height-constrained (e.g. landscape orientation on a small phone).
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
+
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left",   12)
 	margin.add_theme_constant_override("margin_right",  12)
 	margin.add_theme_constant_override("margin_top",    10)
 	margin.add_theme_constant_override("margin_bottom", 10)
-	panel.add_child(margin)
+	scroll.add_child(margin)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 8)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_child(vbox)
 
 	# ── Title ──
@@ -698,10 +724,10 @@ func _build_complete_overlay() -> void:
 	_complete_card = card
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left",   48)
-	margin.add_theme_constant_override("margin_right",  48)
-	margin.add_theme_constant_override("margin_top",    36)
-	margin.add_theme_constant_override("margin_bottom", 36)
+	margin.add_theme_constant_override("margin_left",   UIScale.px(48))
+	margin.add_theme_constant_override("margin_right",  UIScale.px(48))
+	margin.add_theme_constant_override("margin_top",    UIScale.px(36))
+	margin.add_theme_constant_override("margin_bottom", UIScale.px(36))
 	card.add_child(margin)
 
 	var vbox := VBoxContainer.new()
@@ -710,14 +736,14 @@ func _build_complete_overlay() -> void:
 
 	var complete_title_lbl := Label.new()
 	complete_title_lbl.text = "Puzzle Complete!"
-	complete_title_lbl.add_theme_font_size_override("font_size", 40)
+	complete_title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(40))
 	complete_title_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	complete_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(complete_title_lbl)
 
 	var sub_lbl := Label.new()
 	sub_lbl.text = "Well done – all pieces placed!"
-	sub_lbl.add_theme_font_size_override("font_size", 18)
+	sub_lbl.add_theme_font_size_override("font_size", UIScale.font_size(18))
 	sub_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.80))
 	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(sub_lbl)
