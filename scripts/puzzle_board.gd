@@ -21,7 +21,7 @@ const PuzzleGeneratorScript = preload("res://scripts/puzzle_generator.gd")
 ## Confetti celebration effect played on puzzle completion.
 const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 
-## Prototype: puzzle border glow effect played on puzzle completion.
+## Puzzle border glow effect played on puzzle completion.
 const PuzzleGlowEffect = preload("res://scripts/puzzle_glow_effect.gd")
 ## Main menu script – used as the single source of difficulty presets so that
 ## puzzle_board.gd stays in sync with main_menu.gd without duplicating data.
@@ -50,7 +50,7 @@ var _complete_overlay: Control = null
 ## Confetti particle effect shown on puzzle completion.
 var _confetti: Object = null
 
-## Prototype: pulsing border glow shown around the puzzle on completion.
+## Pulsing border glow shown around the puzzle on completion.
 var _glow_effect: Object = null
 
 ## Guard flag: prevents overlapping rebuild calls.
@@ -729,7 +729,7 @@ func _build_complete_overlay() -> void:
 	_confetti = ConfettiEffect.new()
 	_hud.add_child(_confetti)
 
-	# Prototype: glow effect lives on the board's own coordinate space so it
+	# Glow effect lives on the board's own coordinate space so it
 	# aligns with the puzzle grid.  Added to the board (not the HUD) so that
 	# draw_rect coordinates match piece local positions.
 	_glow_effect = PuzzleGlowEffect.new()
@@ -888,14 +888,14 @@ func _build_puzzle() -> void:
 
 ## Plays the board entry animation after each puzzle build.
 ##
-## Two loading-animation prototypes run simultaneously:
+## Two loading animations run simultaneously:
 ##
-##   Prototype A – Puzzle image fade-in
+##   Layer A – Puzzle image fade-in
 ##     A full-screen dark overlay is placed on top of the freshly-built board
 ##     and fades to transparent over ~0.55 s, creating the impression of the
 ##     scattered pieces being gradually revealed from darkness.
 ##
-##   Prototype B – Puzzle pieces assembling
+##   Layer B – Puzzle pieces assembling
 ##     Each piece starts at scale Vector2.ZERO and springs open to its normal
 ##     size using an elastic ease with a 30 ms stagger between pieces.  The
 ##     stagger makes the board feel like it's populating piece-by-piece rather
@@ -904,7 +904,7 @@ func _animate_board_entry() -> void:
 	if _pieces.is_empty():
 		return
 
-	# ── Prototype A: Puzzle image fade-in ──────────────────────────────────────
+	# ── Layer A: Puzzle image fade-in ──────────────────────────────────────────
 	# Clean up any leftover overlay from a previous build before adding a new
 	# one (can happen when "New Puzzle" is pressed during the animation).
 	if is_instance_valid(_entry_overlay):
@@ -924,7 +924,7 @@ func _animate_board_entry() -> void:
 			_entry_overlay = null
 	)
 
-	# ── Prototype B: Puzzle pieces assembling ──────────────────────────────────
+	# ── Layer B: Puzzle pieces assembling ──────────────────────────────────────
 	for i in _pieces.size():
 		var piece = _pieces[i]
 		if not is_instance_valid(piece):

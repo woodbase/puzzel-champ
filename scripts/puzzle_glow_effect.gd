@@ -1,6 +1,6 @@
 extends Node2D
 
-## Prototype: Puzzle Glow Effect
+## Puzzle Glow Effect
 ## Draws a pulsing, multi-layered coloured border that expands outward from the
 ## completed puzzle rectangle.  The glow peaks in brightness at the moment of
 ## completion then slowly fades over FADE_DURATION seconds.
