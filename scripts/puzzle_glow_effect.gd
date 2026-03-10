@@ -15,7 +15,7 @@ const GLOW_COLOR: Color = Color(0.80, 0.60, 1.0)
 
 ## Number of concentric border passes drawn per frame.
 ## Higher values produce a wider, softer halo at the cost of more draw calls.
-const GLOW_LAYERS: int = 5
+const GLOW_LAYERS: int = 3
 
 ## Thickness (pixels) of each individual glow layer.
 const LAYER_THICKNESS: float = 6.0

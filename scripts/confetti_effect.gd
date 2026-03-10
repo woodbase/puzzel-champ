@@ -34,13 +34,13 @@ const CULL_BUFFER: float = 80.0
 
 ## Internal representation of one confetti piece.
 class Particle:
-	var pos:   Vector2
-	var vel:   Vector2
-	var angle: float
-	var spin:  float
-	var color: Color
-	var w:     float
-	var h:     float
+	var pos:         Vector2
+	var vel:         Vector2
+	var angle:       float
+	var spin:        float
+	var color_index: int  ## Index into COLOURS; avoids per-draw colour lookups.
+	var w:           float
+	var h:           float
 
 
 var _particles: Array = []
@@ -99,23 +99,57 @@ func _process(delta: float) -> void:
 
 func _spawn_particle() -> void:
 	var p := Particle.new()
-	p.pos   = Vector2(randf() * _screen_size.x, randf_range(-40.0, -5.0))
-	p.vel   = Vector2(randf_range(-55.0, 55.0), randf_range(70.0, 190.0))
-	p.angle = randf() * TAU
-	p.spin  = randf_range(-6.0, 6.0)
-	p.color = COLOURS[randi() % COLOURS.size()]
-	p.w     = randf_range(7.0, 14.0)
-	p.h     = randf_range(4.0,  8.0)
+	p.pos         = Vector2(randf() * _screen_size.x, randf_range(-40.0, -5.0))
+	p.vel         = Vector2(randf_range(-55.0, 55.0), randf_range(70.0, 190.0))
+	p.angle       = randf() * TAU
+	p.spin        = randf_range(-6.0, 6.0)
+	p.color_index = randi() % COLOURS.size()
+	p.w           = randf_range(7.0, 14.0)
+	p.h           = randf_range(4.0,  8.0)
 	_particles.append(p)
 
 
 func _draw() -> void:
+	if _particles.is_empty():
+		return
+
+	# Build one triangle array covering all active particles.
+	# RenderingServer.canvas_item_add_triangle_array submits every particle
+	# in a single GPU draw call, regardless of colour or count.
+	var points := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+
 	for p: Particle in _particles:
+		var cos_a: float = cos(p.angle)
+		var sin_a: float = sin(p.angle)
 		var hw: float = p.w * 0.5
 		var hh: float = p.h * 0.5
-		# Use a per-particle transform instead of building a corner array each
-		# frame, avoiding a PackedVector2Array allocation per particle.
-		draw_set_transform(p.pos, p.angle, Vector2.ONE)
-		draw_rect(Rect2(Vector2(-hw, -hh), Vector2(p.w, p.h)), p.color, true)
-	# Restore the default transform so any subsequent drawing is unaffected.
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		# Rotate the four rectangle corners about the particle centre and
+		# translate to world-space – no draw_set_transform call needed.
+		var v0 := p.pos + Vector2(-hw * cos_a + hh * sin_a, -hw * sin_a - hh * cos_a)
+		var v1 := p.pos + Vector2( hw * cos_a + hh * sin_a,  hw * sin_a - hh * cos_a)
+		var v2 := p.pos + Vector2( hw * cos_a - hh * sin_a,  hw * sin_a + hh * cos_a)
+		var v3 := p.pos + Vector2(-hw * cos_a - hh * sin_a, -hw * sin_a + hh * cos_a)
+		var base: int = points.size()
+		points.append(v0)
+		points.append(v1)
+		points.append(v2)
+		points.append(v3)
+		var c: Color = COLOURS[p.color_index]
+		colors.append(c)
+		colors.append(c)
+		colors.append(c)
+		colors.append(c)
+		# Two triangles forming the quad: (v0, v1, v2) and (v0, v2, v3).
+		indices.append(base)
+		indices.append(base + 1)
+		indices.append(base + 2)
+		indices.append(base)
+		indices.append(base + 2)
+		indices.append(base + 3)
+
+	# Submit all particles in a single GPU draw call.
+	RenderingServer.canvas_item_add_triangle_array(
+		get_canvas_item(), indices, points, colors
+	)
