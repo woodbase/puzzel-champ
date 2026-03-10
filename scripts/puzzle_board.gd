@@ -769,7 +769,7 @@ func _refresh_menu_diff_highlight() -> void:
 	for i in range(_menu_diff_btns.size()):
 		var btn := _menu_diff_btns[i]
 		var d: Dictionary = MainMenuScript.DIFFICULTIES[i]
-		var active := (d["cols"] == GameState.cols and d["rows"] == GameState.rows)
+		var active: bool = (d["cols"] == GameState.cols and d["rows"] == GameState.rows)
 		var sb_normal: StyleBoxFlat = btn.get_theme_stylebox("normal") as StyleBoxFlat
 		var sb_hover: StyleBoxFlat  = btn.get_theme_stylebox("hover")  as StyleBoxFlat
 		if sb_normal != null:
@@ -1303,7 +1303,7 @@ func _animate_board_entry() -> void:
 			continue
 		piece.scale = Vector2.ZERO
 		var delay: float = i * PIECE_STAGGER_DELAY
-		var piece_tween := piece.create_tween()
+		var piece_tween: Tween = piece.create_tween()
 		piece_tween.tween_interval(delay)
 		piece_tween.tween_property(piece, "scale", Vector2.ONE, 0.40) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
