@@ -32,6 +32,9 @@ const DRAG_Z_INDEX: int = 10
 ## actual piece size rather than using a fixed pixel value.
 var snap_distance: float = 40.0
 
+## Buffer seconds added after particle lifetime before the node is freed.
+const PARTICLE_CLEANUP_DELAY: float = 0.2
+
 ## Golden colour used for the lock-particle burst.
 const PARTICLE_COLOR: Color = Color(1.0, 0.9, 0.3)
 
@@ -140,7 +143,7 @@ func _spawn_lock_particles() -> void:
 
 	# Start emitting, then clean up after the burst finishes.
 	particles.emitting = true
-	var timer := get_tree().create_timer(particles.lifetime + 0.2)
+	var timer := get_tree().create_timer(particles.lifetime + PARTICLE_CLEANUP_DELAY)
 	timer.timeout.connect(func() -> void:
 		if is_instance_valid(particles):
 			particles.queue_free()
