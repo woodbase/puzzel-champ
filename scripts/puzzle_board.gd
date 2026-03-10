@@ -70,9 +70,6 @@ var _puzzle_origin: Vector2 = Vector2.ZERO
 ## The piece currently being dragged, or null when nothing is held.
 var _dragged_piece = null
 
-## Pixel radius within which the target highlight is shown.
-const HIGHLIGHT_DISTANCE: float = 60.0
-
 ## All puzzle pieces created during the last _build_puzzle() call.
 ## Kept so the board entry animation can target each piece individually.
 var _pieces: Array = []
@@ -186,10 +183,13 @@ func _draw() -> void:
 	var target_local: Vector2 = _dragged_piece.correct_position
 	var target_global: Vector2 = to_global(target_local)
 	var dist: float = _dragged_piece.global_position.distance_to(target_global)
-	if dist >= HIGHLIGHT_DISTANCE:
+	# Highlight radius is 50 % of the piece side, which is always larger than the
+	# 35 % snap threshold so the green glow appears before the piece locks in place.
+	var highlight_distance: float = _piece_size * 0.5
+	if dist >= highlight_distance:
 		return
 	# Alpha increases as the piece approaches the target (0 at edge → 1 at centre).
-	var alpha: float = 1.0 - (dist / HIGHLIGHT_DISTANCE)
+	var alpha: float = 1.0 - (dist / highlight_distance)
 	var half: float = _piece_size * 0.5
 	var rect := Rect2(target_local - Vector2(half, half), Vector2(_piece_size, _piece_size))
 	draw_rect(rect, Color(0.2, 0.85, 0.2, alpha * 0.25), true)
@@ -855,9 +855,14 @@ func _build_puzzle() -> void:
 		col_shape.shape = rect_shape
 
 		piece.correct_position = correct_pos
+		# Scale snap threshold to the actual screen-space piece size so snapping
+		# feels consistent regardless of grid size or screen resolution.
+		# 35 % of the piece side is tight enough to prevent false snaps to
+		# adjacent slots while remaining easy to hit intentionally.
+		piece.snap_distance = screen_piece_size * 0.35
 
 		# Spawn randomly; keep pieces below the HUD bar.
-		var half := piece_size * 0.5
+		var half := _piece_size * 0.5
 		var spawn_pos := Vector2(
 			randf_range(half, viewport_size.x - half),
 			randf_range(HUD_H + half, viewport_size.y - half)

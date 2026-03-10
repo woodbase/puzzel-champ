@@ -28,7 +28,9 @@ var _original_z_index: int = 0
 const DRAG_Z_INDEX: int = 10
 
 ## Distance threshold in pixels for snapping to the correct position.
-const SNAP_DISTANCE: float = 20.0
+## Set by PuzzleBoard after instantiation so the threshold scales with the
+## actual piece size rather than using a fixed pixel value.
+var snap_distance: float = 40.0
 
 ## Golden colour used for the lock-particle burst.
 const PARTICLE_COLOR: Color = Color(1.0, 0.9, 0.3)
@@ -91,7 +93,7 @@ func _end_drag() -> void:
 
 	var correct_global: Vector2 = parent_2d.to_global(correct_position)
 	var distance := global_position.distance_to(correct_global)
-	if distance < SNAP_DISTANCE:
+	if distance < snap_distance:
 		global_position = correct_global
 		is_locked = true
 		if GameState.feedback_haptic:
