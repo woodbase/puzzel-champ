@@ -96,8 +96,9 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - name: Install Android SDK Build Tools
-        run: | 
-          yes | $ANDROID_HOME/tools/bin/sdkmanager "build-tools;34.0.0"
+        run: |
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-/opt/android/sdk}"
+            yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0"
       - name: Checkout
         uses: actions/checkout@v4
         with:
