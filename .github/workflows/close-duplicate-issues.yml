@@ -1,0 +1,140 @@
+name: Close Duplicate Issues
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/close-duplicate-issues.yml'
+
+permissions:
+  issues: write
+
+jobs:
+  close-duplicates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create duplicate label and close duplicate issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // Ensure the "duplicate" label exists.
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'duplicate',
+                color: 'cfd3d7',
+                description: 'This issue or pull request already exists'
+              });
+              console.log('Created label: duplicate');
+            } catch (err) {
+              if (err.status === 422) {
+                console.log('Label "duplicate" already exists');
+              } else {
+                throw err;
+              }
+            }
+
+            // Issues that duplicate features already implemented in the codebase.
+            // Each entry maps an issue number to a short description of what
+            // implements it, so the closing comment is informative.
+            const duplicates = [
+              // Milestone 1 – Core Gameplay Stabilization (all implemented)
+              { number: 145, reason: 'Puzzle piece generation is fully implemented in `scripts/puzzle_generator.gd`, supporting both square and jigsaw piece shapes with polygon-based generation.' },
+              { number: 146, reason: 'Piece snapping logic is implemented in `scripts/puzzle_board.gd` and `scripts/puzzle_piece.gd` with a 35% snap-distance threshold and grid-position validation.' },
+              { number: 147, reason: 'Incorrect placements are already prevented: pieces can only snap to their exact correct grid slot; any other release leaves them freely draggable.' },
+              { number: 148, reason: 'Pieces are locked in place (`is_locked = true`) when correctly snapped, preventing accidental movement, with audio and visual snap feedback.' },
+              { number: 149, reason: 'Puzzle completion is detected in `on_piece_placed()` by comparing `_placed_pieces` against `_total_pieces`, triggering the victory overlay.' },
+              { number: 150, reason: 'A **Restart** button is present in the HUD and resets all pieces to their original shuffled positions via `_on_restart_puzzle()`.' },
+              { number: 151, reason: 'The puzzle system works across all supported grid sizes (Easy 2×3, Medium 3×4, Hard 4×6, Expert 6×8); piece counts are driven by the difficulty selection.' },
+              // Milestone 2 – Responsive Game Logic (all implemented)
+              { number: 152, reason: 'Screen size and device type are detected at startup in `GameState._ready()` using `OS.has_feature("mobile")` and `DisplayServer.screen_get_size()`.' },
+              { number: 153, reason: 'Four difficulty tiers are defined — Easy (6 pieces), Medium (12), Hard (24), Expert (48) — following an exponential 2× progression.' },
+              { number: 154, reason: 'Automatic difficulty selection is implemented in `GameState._ready()`: mobile defaults to Easy (6 pieces), desktop to Medium (12 pieces).' },
+              { number: 155, reason: 'Manual difficulty override is available via the difficulty buttons on the main menu and inside the in-game settings panel.' },
+              { number: 156, reason: 'Grid dimensions (`cols` × `rows`) are set from the chosen difficulty tier and passed to `PuzzleGenerator` when building the board.' },
+              // Milestone 3 – UI Design (all implemented)
+              { number: 157, reason: 'Desktop UI is implemented in `scripts/main_menu.gd` and `scripts/puzzle_board.gd` with a side-by-side landscape layout.' },
+              { number: 158, reason: 'Mobile UI is implemented with a stacked portrait layout, larger touch targets, and simplified controls via `UIScale`.' },
+              { number: 159, reason: 'The responsive UI system is provided by the `UIScale` autoload (`scripts/ui_scale.gd`), which emits `layout_changed` and drives adaptive sizing across all screens.' },
+              { number: 177, reason: 'Responsive layout and adaptive piece sizing ensure the puzzle works correctly on all device sizes; covered by the `UIScale` system and responsive board building.' },
+              // Workspace features (all implemented)
+              { number: 160, reason: 'Sorting boxes are fully implemented in `scripts/puzzle_board.gd`: a left-side panel with predefined and custom categories lets players organise loose pieces.' },
+              { number: 161, reason: 'A floating reference-image panel with a tap-to-zoom full-screen overlay is implemented in `_build_preview_panel()` inside `scripts/puzzle_board.gd`.' },
+              { number: 162, reason: 'Workspace zoom (scroll wheel / pinch) and pan (middle-mouse drag / two-finger drag) are implemented via a `Camera2D` in `scripts/puzzle_board.gd`.' },
+              // Milestone 4 – Audio System (all implemented)
+              { number: 163, reason: 'A procedurally generated pickup sound is played by `_pickup_player` in `scripts/puzzle_board.gd` whenever a piece is lifted, gated by `GameState.feedback_audio`.' },
+              { number: 164, reason: 'A procedurally generated snap sound is played by `_snap_player` in `scripts/puzzle_board.gd` when a piece locks into its correct position.' },
+              { number: 166, reason: 'Optional background music is implemented: a looping procedural music track is generated and played by `_music_player`, toggled by `GameState.music_enabled`.' },
+              { number: 167, reason: 'A volume control slider is present in the settings panel, writing to `GameState.volume` (0–1) which is applied via `linear_to_db()` to all audio players.' },
+              // Milestone 5 – Visual Effects and Feedback (all implemented)
+              { number: 168, reason: 'A scale-bounce tween animation plays on the piece sprite when it snaps into place, implemented in `scripts/puzzle_piece.gd`.' },
+              { number: 169, reason: 'A green highlight rectangle is drawn at the target snap position while a piece is dragged close enough, implemented in `_draw()` inside `scripts/puzzle_board.gd`.' },
+              { number: 170, reason: 'A burst of golden `CPUParticles2D` particles is spawned at the locked position via `_spawn_lock_particles()` in `scripts/puzzle_piece.gd` each time a piece snaps.' },
+              { number: 171, reason: 'Victory feedback includes a confetti particle system (`ConfettiEffect`), a pulsing board-border glow (`PuzzleGlowEffect`), a piece celebration wave, and a completion fanfare sound.' },
+              // Milestone 6 – Animation Exploration (all implemented)
+              { number: 172, reason: 'A board-entry loading animation (image fade-in + staggered piece scale-in with bounce tweens) runs each time a puzzle is built, in `_play_board_entry_animation()`.' },
+              { number: 173, reason: 'Victory animations are implemented: confetti particles, border glow, and a staggered piece celebration wave all play on puzzle completion.' },
+              { number: 174, reason: "The animation system is implemented using Godot's built-in `Tween` API throughout `scripts/puzzle_board.gd` and `scripts/puzzle_piece.gd`." },
+              // Milestone 7 – Content (all implemented)
+              { number: 175, reason: 'Multiple built-in puzzle images are included in `gfx/puzzles/`, selectable from the gallery panel on the main menu.' },
+              { number: 176, reason: 'Difficulty progression is fully implemented: Easy → Medium → Hard → Expert with 6 / 12 / 24 / 48 pieces following a 2× exponential step.' },
+              { number: 183, reason: 'A puzzle timer is shown in the HUD, counting up from zero while the puzzle is in progress and displaying the final time on the completion card.' },
+              { number: 185, reason: 'Custom image uploads are supported: players can upload their own images which are copied to `user://gallery/` and loaded on subsequent sessions.' },
+              // Piece-shape requests (implemented + direct duplicate)
+              { number: 189, reason: 'Rounded/irregular jigsaw piece shapes are implemented in `PuzzleGenerator` (`scripts/puzzle_generator.gd`) as `PieceShape.JIGSAW`, selectable from the main menu.' },
+              { number: 190, reason: 'Duplicate of #189. Irregular piece shapes are already implemented as the **Jigsaw** shape option in `PuzzleGenerator`; all pieces have unique, interlocking outlines.' },
+            ];
+
+            for (const { number, reason } of duplicates) {
+              // Check the issue is still open before touching it.
+              let issue;
+              try {
+                const resp = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: number
+                });
+                issue = resp.data;
+              } catch (err) {
+                console.warn(`Could not fetch issue #${number}: ${err.message}`);
+                continue;
+              }
+
+              if (issue.state !== 'open') {
+                console.log(`Issue #${number} is already closed – skipping`);
+                continue;
+              }
+
+              // Add the "duplicate" label.
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                labels: ['duplicate']
+              });
+
+              // Post a closing comment.
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                body: `## Closing as duplicate\n\nThis feature has already been implemented in the codebase.\n\n${reason}\n\nClosing this issue as a duplicate of the existing implementation. Feel free to reopen if you believe something is still missing.`
+              });
+
+              // Close the issue.
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                state: 'closed',
+                state_reason: 'not_planned'
+              });
+
+              console.log(`Closed issue #${number} as duplicate`);
+            }
+
+            console.log('Done closing duplicate issues.');
