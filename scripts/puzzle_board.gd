@@ -1233,10 +1233,13 @@ func _build_puzzle() -> void:
 	var oversample: float = 1.0 if GameState.is_mobile else SOURCE_OVERSAMPLE
 	var max_source_w: int = int(ceil(screen_piece_w * oversample))
 	var max_source_h: int = int(ceil(screen_piece_h * oversample))
-	if max_source_w > 0:
-		image_piece_w = min(image_piece_w, max_source_w)
-	if max_source_h > 0:
-		image_piece_h = min(image_piece_h, max_source_h)
+	var pixel_scale: float = 1.0
+	if image_piece_w > 0 and max_source_w > 0:
+		pixel_scale = minf(pixel_scale, float(max_source_w) / float(image_piece_w))
+	if image_piece_h > 0 and max_source_h > 0:
+		pixel_scale = minf(pixel_scale, float(max_source_h) / float(image_piece_h))
+	image_piece_w = maxi(1, int(floor(float(image_piece_w) * pixel_scale)))
+	image_piece_h = maxi(1, int(floor(float(image_piece_h) * pixel_scale)))
 
 	# Resize the image to be exactly cols × image_piece_w wide and
 	# rows × image_piece_h tall so that integer-division truncation cannot
@@ -1249,6 +1252,8 @@ func _build_puzzle() -> void:
 	if image.get_width() != target_img_w or image.get_height() != target_img_h:
 		var interp: int = Image.INTERPOLATE_BILINEAR if GameState.is_mobile else Image.INTERPOLATE_LANCZOS
 		image.resize(target_img_w, target_img_h, interp)
+		img_w = image.get_width()
+		img_h = image.get_height()
 
 	# Centre the puzzle grid on the available canvas area.
 	_puzzle_origin = Vector2(
