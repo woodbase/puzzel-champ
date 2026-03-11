@@ -1,5 +1,17 @@
 extends Node
 
+## Path to the single save-slot file used to persist puzzle progress.
+const SAVE_PATH: String = "user://puzzle_save.json"
+
+## True when a saved puzzle exists in the save slot and can be resumed.
+## Initialised in _ready() by checking whether the save file is present.
+var has_save: bool = false
+
+## Set to true by the main menu when the player chooses "Resume Saved Puzzle".
+## puzzle_board reads this flag during _ready() to restore the saved state
+## instead of starting a fresh puzzle, then clears it immediately after use.
+var resume_save: bool = false
+
 ## True when the game is running on a mobile device (Android or iOS).
 ## Detected once at startup; read-only after _ready().
 var is_mobile: bool = false
@@ -67,6 +79,9 @@ const LEADERBOARD_MAX_PER_DIFF := 10
 var _leaderboard: Array = []
 
 func _ready() -> void:
+	# ── Detect whether a puzzle save exists ──────────────────────────────────
+	has_save = FileAccess.file_exists(SAVE_PATH)
+
 	# ── Device-type detection ────────────────────────────────────────────────
 	# OS.has_feature("mobile") is Godot's canonical check for Android and iOS.
 	# It is evaluated before any scene loads, satisfying the startup-detection

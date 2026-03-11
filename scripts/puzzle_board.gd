@@ -212,6 +212,12 @@ const SNAP_BASE_DB: float = -6.0
 const COMPLETE_BASE_DB: float = -3.0
 const MUSIC_BASE_DB: float = -18.0
 
+## Path to the single save-slot file (mirrors GameState.SAVE_PATH for convenience).
+const SAVE_PATH: String = "user://puzzle_save.json"
+
+## Small HUD label that shows the save-slot status ("💾 Slot 1" or nothing).
+var _save_slot_label: Label = null
+
 ## Minimum linear volume passed to linear_to_db() to avoid log(0) errors.
 const MIN_VOLUME_LINEAR: float = 0.0001
 
@@ -278,6 +284,9 @@ func _ready() -> void:
 
 	if source_texture != null:
 		_build_puzzle()
+		if GameState.resume_save:
+			GameState.resume_save = false
+			_apply_saved_state()
 	else:
 		_show_no_image_message()
 
@@ -358,6 +367,12 @@ func _build_hud() -> void:
 	_hud_hbox.add_child(restart_btn)
 	_hud_buttons.append(restart_btn)
 
+	var save_btn := _make_hud_button("Save")
+	save_btn.pressed.connect(_on_save_pressed)
+	save_btn.tooltip_text = "Save progress to Slot 1"
+	_hud_hbox.add_child(save_btn)
+	_hud_buttons.append(save_btn)
+
 	_preview_toggle_btn = _make_hud_button("Preview: On")
 	_preview_toggle_btn.pressed.connect(_toggle_preview)
 	_preview_toggle_btn.tooltip_text = "Show / hide puzzle reference image"
@@ -373,6 +388,14 @@ func _build_hud() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hud_hbox.add_child(spacer)
+
+	_save_slot_label = Label.new()
+	_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(14))
+	_save_slot_label.add_theme_color_override("font_color", Color(0.60, 0.85, 0.65))
+	_save_slot_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
+	_save_slot_label.visible = false
+	_hud_hbox.add_child(_save_slot_label)
 
 	_timer_label = Label.new()
 	_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
@@ -438,6 +461,10 @@ func _on_layout_changed() -> void:
 	if _counter_label != null:
 		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
 		_counter_label.custom_minimum_size = Vector2(0, HUD_H)
+
+	if _save_slot_label != null:
+		_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(14))
+		_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
 
 	if _timer_label != null:
 		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
@@ -1430,6 +1457,8 @@ func _on_piece_released() -> void:
 func _show_complete() -> void:
 	_timer_running = false
 	_update_timer_label()
+	# Clear the save slot so "Resume" is not shown in the menu after completion.
+	_clear_save()
 	# Persist this run's score to the leaderboard.
 	GameState.save_score(_timer_elapsed, cols, rows)
 	if _complete_time_lbl != null:
@@ -1863,6 +1892,148 @@ func _on_back_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
+# ─── Save / Load ──────────────────────────────────────────────────────────────
+
+## Saves the current puzzle state (piece positions + lock states + timer) to
+## the single save slot at SAVE_PATH.  Updates GameState.has_save and refreshes
+## the HUD indicator.
+func _on_save_pressed() -> void:
+	_save_puzzle_state()
+
+
+## Writes the current puzzle state to SAVE_PATH as JSON.
+func _save_puzzle_state() -> void:
+	if _pieces.is_empty():
+		return
+
+	var pieces_data: Array = []
+	for piece in _pieces:
+		if not is_instance_valid(piece):
+			push_warning("PuzzleBoard: cannot save – a piece node is no longer valid.")
+			return
+		pieces_data.append({
+			"pos_x": piece.position.x,
+			"pos_y": piece.position.y,
+			"is_locked": piece.is_locked
+		})
+
+	var save_data: Dictionary = {
+		"version": 1,
+		"image_path": GameState.image_path,
+		"gallery_index": GameState.gallery_index,
+		"cols": cols,
+		"rows": rows,
+		"piece_shape": _piece_shape,
+		"elapsed_time": _timer_elapsed,
+		"pieces": pieces_data
+	}
+
+	var json_string := JSON.stringify(save_data)
+	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file == null:
+		push_error("PuzzleBoard: Failed to open save file for writing (error %d)." % FileAccess.get_open_error())
+		return
+	file.store_string(json_string)
+	file.close()
+
+	GameState.has_save = true
+	_update_save_slot_label(true)
+	_show_save_notification()
+
+
+## Reads the saved state from SAVE_PATH and applies it to the already-built
+## puzzle (piece positions, lock states, and elapsed timer).
+## Called after _build_puzzle() when GameState.resume_save was true.
+func _apply_saved_state() -> void:
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null:
+		push_warning("PuzzleBoard: No save file found at %s" % SAVE_PATH)
+		return
+	var json_string := file.get_as_text()
+	file.close()
+
+	var json := JSON.new()
+	if json.parse(json_string) != OK:
+		push_warning("PuzzleBoard: Failed to parse save file JSON.")
+		return
+
+	var save_data: Dictionary = json.get_data()
+	if not save_data.has("pieces"):
+		push_warning("PuzzleBoard: Save file missing 'pieces' key.")
+		return
+
+	var pieces_data: Array = save_data["pieces"]
+	if pieces_data.size() != _pieces.size():
+		push_warning("PuzzleBoard: Save piece count (%d) differs from current (%d); skipping restore." \
+			% [pieces_data.size(), _pieces.size()])
+		return
+
+	# Restore the elapsed time; _timer_running is already true from _build_puzzle().
+	_timer_elapsed = float(save_data.get("elapsed_time", 0.0))
+	_timer_last_s  = -1
+	_update_timer_label()
+
+	# Restore each piece's position and locked state.
+	_placed_pieces = 0
+	for i in range(_pieces.size()):
+		var piece = _pieces[i]
+		if not is_instance_valid(piece):
+			continue
+		var pd: Dictionary = pieces_data[i]
+		piece.position = Vector2(float(pd.get("pos_x", 0.0)), float(pd.get("pos_y", 0.0)))
+		var locked: bool = bool(pd.get("is_locked", false))
+		if locked:
+			piece.is_locked       = true
+			piece.input_pickable  = false
+			_placed_pieces       += 1
+
+	_update_counter()
+	_update_save_slot_label(true)
+
+
+## Deletes the save file and clears the has_save flag.
+## Called on puzzle completion, restart, and new-puzzle to keep the save
+## slot consistent with the current game state.
+func _clear_save() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	GameState.has_save = false
+	_update_save_slot_label(false)
+
+
+## Updates the save-slot indicator label in the HUD.
+## *saved* = true shows "💾 Saved", false hides the label.
+func _update_save_slot_label(saved: bool) -> void:
+	if _save_slot_label == null:
+		return
+	_save_slot_label.text = "💾 Saved"
+	_save_slot_label.visible = saved
+
+
+## Shows a brief "Game saved!" toast label that fades out after 1.5 s.
+func _show_save_notification() -> void:
+	var lbl := Label.new()
+	lbl.text = "Game saved!"
+	lbl.add_theme_font_size_override("font_size", UIScale.font_size(15))
+	lbl.add_theme_color_override("font_color", Color(0.60, 0.95, 0.70))
+	# Anchor the toast to the top centre of the HUD.
+	lbl.anchor_left   = 0.5
+	lbl.anchor_right  = 0.5
+	lbl.anchor_top    = 0.0
+	lbl.anchor_bottom = 0.0
+	lbl.offset_left   = -80
+	lbl.offset_right  = 80
+	lbl.offset_top    = HUD_H + 6
+	lbl.offset_bottom = HUD_H + 30
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hud.add_child(lbl)
+
+	var tween := create_tween()
+	tween.tween_interval(1.0)
+	tween.tween_property(lbl, "modulate:a", 0.0, 0.5).set_ease(Tween.EASE_IN)
+	tween.tween_callback(lbl.queue_free)
+
+
 ## Resets all pieces to their initial positions without rebuilding the puzzle.
 ## Pieces are returned to their starting locations and their locked state is
 ## cleared so the puzzle can be solved again from the beginning.
@@ -1888,6 +2059,9 @@ func _on_restart_puzzle() -> void:
 
 	# Return all pieces from sorting boxes so the restart loop can reposition them.
 	_clear_all_sorting_boxes()
+
+	# Discard any saved state: after a restart the pieces are at new positions.
+	_clear_save()
 
 	_placed_pieces = 0
 	_update_counter()
@@ -1932,6 +2106,9 @@ func _on_new_puzzle() -> void:
 
 	# Clear box piece lists before freeing pieces so references don't linger.
 	_clear_all_sorting_boxes()
+
+	# Discard any saved state: new puzzle means a fresh start.
+	_clear_save()
 
 	for piece in get_tree().get_nodes_in_group("puzzle_pieces"):
 		piece.queue_free()

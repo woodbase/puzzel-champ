@@ -72,6 +72,7 @@ var _no_image_lbl: Label         = null
 var _piece_count_lbl: Label      = null
 var _difficulty_desc_lbl: Label  = null
 var _start_btn: Button           = null
+var _resume_btn: Button          = null
 var _file_dialog: FileDialog     = null
 var _gallery_grid: GridContainer = null  # kept for dynamic item insertion
 ## Top-level layout container (HBoxContainer in landscape, VBoxContainer in portrait).
@@ -537,6 +538,12 @@ func _build_settings_panel() -> Control:
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(spacer)
 
+	# ── Resume saved puzzle (shown only when a save exists) ──
+	_resume_btn = _make_resume_button()
+	_resume_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_resume_btn.pressed.connect(_on_resume_pressed)
+	_resume_btn.visible = GameState.has_save
+	vbox.add_child(_resume_btn)
 	# ── Leaderboard button ──
 	var lb_btn := _make_button("🏆 Leaderboard")
 	lb_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -590,6 +597,35 @@ func _make_button(label_text: String) -> Button:
 			"normal":  sb.bg_color = BTN_COLOR
 			"hover":   sb.bg_color = BTN_COLOR.lightened(0.20)
 			"pressed": sb.bg_color = BTN_COLOR.darkened(0.15)
+		_set_corner_radius(sb, 8)
+		sb.content_margin_left   = padding_h
+		sb.content_margin_right  = padding_h
+		sb.content_margin_top    = padding_v
+		sb.content_margin_bottom = padding_v
+		btn.add_theme_stylebox_override(state, sb)
+
+	return btn
+
+
+## Creates the "Resume Saved Puzzle" button with a distinct green tint to
+## differentiate it from the standard Start button.
+func _make_resume_button() -> Button:
+	var btn := Button.new()
+	btn.text = "▶  Resume Saved Puzzle"
+	btn.add_theme_color_override("font_color", Color(0.90, 1.00, 0.92))
+	var portrait := UIScale.is_portrait()
+	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
+	btn.custom_minimum_size = Vector2(0, 54)
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+	var padding_v := UIScale.px(14.0 if portrait else 10.0)
+	var padding_h := UIScale.px(16.0 if portrait else 14.0)
+	for state in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		match state:
+			"normal":  sb.bg_color = Color(0.15, 0.42, 0.25)
+			"hover":   sb.bg_color = Color(0.20, 0.54, 0.32)
+			"pressed": sb.bg_color = Color(0.10, 0.30, 0.18)
 		_set_corner_radius(sb, 8)
 		sb.content_margin_left   = padding_h
 		sb.content_margin_right  = padding_h
@@ -843,6 +879,52 @@ func _on_start_pressed() -> void:
 	GameState.cols          = d["cols"]
 	GameState.rows          = d["rows"]
 	GameState.piece_shape   = SHAPES[_shape_index]["key"]
+	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
+
+
+## Resumes the saved puzzle from the single save slot.
+## Reads the save file to restore image, grid size, and piece shape in
+## GameState, then sets the resume_save flag before switching scenes.
+func _on_resume_pressed() -> void:
+	var file := FileAccess.open(GameState.SAVE_PATH, FileAccess.READ)
+	if file == null:
+		_show_error("No saved puzzle found.")
+		return
+	var json_string := file.get_as_text()
+	file.close()
+
+	var json := JSON.new()
+	if json.parse(json_string) != OK:
+		_show_error("Save file is corrupted. Please start a new puzzle.")
+		return
+
+	var save_data: Dictionary = json.get_data()
+
+	# Determine image source: prefer path, fall back to gallery index.
+	var img_path: String = save_data.get("image_path", "")
+	var gallery_idx: int = int(save_data.get("gallery_index", -1))
+	var img: Image = null
+
+	if img_path != "":
+		img = Image.load_from_file(img_path)
+	if img == null and gallery_idx >= 0 and gallery_idx < _gallery_paths.size():
+		img_path = _gallery_paths[gallery_idx]
+		img = Image.load_from_file(img_path)
+	if img == null:
+		_show_error("Could not load the saved puzzle image. It may have been deleted.")
+		return
+
+	_limit_image_size(img)
+	var texture := ImageTexture.create_from_image(img)
+
+	GameState.image_texture          = texture
+	GameState.image_path             = img_path
+	GameState.gallery_index          = gallery_idx
+	GameState.cols                   = int(save_data.get("cols", GameState.cols))
+	GameState.rows                   = int(save_data.get("rows", GameState.rows))
+	GameState.piece_shape            = str(save_data.get("piece_shape", GameState.piece_shape))
+	GameState.difficulty_explicitly_set = true
+	GameState.resume_save            = true
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
 
 
