@@ -160,10 +160,12 @@ func _spawn_lock_particles() -> void:
 	var particles := CPUParticles2D.new()
 	add_child(particles)
 
-	# Burst of 18 small golden dots (increased from 12) – one-shot, fully simultaneous.
+	# Use fewer, simpler particles on mobile to reduce GPU and CPU pressure.
+	var is_mobile: bool = GameState.is_mobile
+	# Burst of golden dots – one-shot, fully simultaneous.
 	particles.one_shot = true
 	particles.explosiveness = 1.0
-	particles.amount = 18
+	particles.amount = 8 if is_mobile else 18
 	particles.lifetime = 0.7
 
 	# Emit from a small area around the piece centre.
@@ -187,12 +189,14 @@ func _spawn_lock_particles() -> void:
 	particles.scale_amount_min = 2.0
 	particles.scale_amount_max = 5.0
 
-	# Add scale curve for particles to shrink as they fade.
-	var scale_curve := Curve.new()
-	scale_curve.add_point(Vector2(0.0, 1.0))
-	scale_curve.add_point(Vector2(0.7, 0.8))
-	scale_curve.add_point(Vector2(1.0, 0.3))
-	particles.scale_amount_curve = scale_curve
+	# Add scale curve for particles to shrink as they fade (skip on mobile to
+	# avoid per-frame curve evaluation overhead).
+	if not is_mobile:
+		var scale_curve := Curve.new()
+		scale_curve.add_point(Vector2(0.0, 1.0))
+		scale_curve.add_point(Vector2(0.7, 0.8))
+		scale_curve.add_point(Vector2(1.0, 0.3))
+		particles.scale_amount_curve = scale_curve
 
 	# Start emitting, then clean up after the burst finishes.
 	particles.emitting = true
