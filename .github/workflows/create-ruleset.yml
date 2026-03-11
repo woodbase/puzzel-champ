@@ -1,0 +1,78 @@
+name: Create Branch Ruleset
+
+on:
+  workflow_dispatch:
+
+permissions:
+  administration: write
+
+jobs:
+  create-ruleset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or update branch ruleset
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const rulesetName = 'main branch protection';
+
+            const rulesetConfig = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: rulesetName,
+              target: 'branch',
+              enforcement: 'active',
+              conditions: {
+                ref_name: {
+                  include: ['refs/heads/main'],
+                  exclude: []
+                }
+              },
+              rules: [
+                {
+                  type: 'deletion'
+                },
+                {
+                  type: 'non_fast_forward'
+                },
+                {
+                  type: 'required_status_checks',
+                  parameters: {
+                    strict_required_status_checks_policy: true,
+                    required_status_checks: [
+                      { context: 'test' }
+                    ]
+                  }
+                },
+                {
+                  type: 'pull_request',
+                  parameters: {
+                    required_approving_review_count: 1,
+                    dismiss_stale_reviews_on_push: false,
+                    require_code_owner_reviews: false,
+                    require_last_push_approval: false,
+                    required_review_thread_resolution: false
+                  }
+                }
+              ]
+            };
+
+            const { data: existing } = await github.rest.repos.getRepoRulesets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const found = existing.find(r => r.name === rulesetName);
+
+            if (found) {
+              console.log(`Ruleset "${rulesetName}" already exists (ID: ${found.id}). Updating...`);
+              await github.rest.repos.updateRepoRuleset({
+                ...rulesetConfig,
+                ruleset_id: found.id,
+              });
+              console.log('Ruleset updated successfully.');
+            } else {
+              await github.rest.repos.createRepoRuleset(rulesetConfig);
+              console.log('Ruleset created successfully.');
+            }
