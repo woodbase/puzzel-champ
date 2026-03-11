@@ -1,0 +1,147 @@
+name: Build Exports
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.3"
+  EXPORT_NAME: "puzzle-champ"
+  PROJECT_PATH: "."
+
+jobs:
+  export-windows:
+    name: Windows Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* \
+             ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Create Builds Directory
+        run: mkdir -p $PROJECT_PATH/builds/windows
+
+      - name: Windows Build
+        run: |
+          cd $PROJECT_PATH
+          godot --headless --verbose --export-release "Windows Desktop" \
+            builds/windows/$EXPORT_NAME.exe
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: ${{ env.PROJECT_PATH }}/builds/windows/
+          retention-days: 14
+
+  export-linux:
+    name: Linux Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* \
+             ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Create Builds Directory
+        run: mkdir -p $PROJECT_PATH/builds/linux
+
+      - name: Linux Build
+        run: |
+          cd $PROJECT_PATH
+          godot --headless --verbose --export-release "Linux/X11" \
+            builds/linux/$EXPORT_NAME.x86_64
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: ${{ env.PROJECT_PATH }}/builds/linux/
+          retention-days: 14
+
+  export-android:
+    name: Android Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Export Templates
+        run: |
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* \
+             ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Setup Android Keystore (Debug)
+        run: |
+          keytool -genkey -v -keystore debug.keystore -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Configure Android Export Settings
+        run: |
+          cd $PROJECT_PATH
+          # Inject debug keystore path into export_presets.cfg at runtime
+          sed -i "s|keystore/debug=\"\"|keystore/debug=\"$(pwd)/debug.keystore\"|" export_presets.cfg
+          sed -i 's|keystore/debug_user=""|keystore/debug_user="androiddebugkey"|' export_presets.cfg
+          sed -i 's|keystore/debug_password=""|keystore/debug_password="android"|' export_presets.cfg
+
+      - name: Create Builds Directory
+        run: mkdir -p $PROJECT_PATH/builds/android
+
+      - name: Android Build
+        run: |
+          cd $PROJECT_PATH
+          godot --headless --verbose --export-debug "Android" \
+            builds/android/$EXPORT_NAME.apk
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: ${{ env.PROJECT_PATH }}/builds/android/
+          retention-days: 14
