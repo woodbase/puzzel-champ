@@ -3,9 +3,6 @@ name: Create Branch Ruleset
 on:
   workflow_dispatch:
 
-permissions:
-  administration: write
-
 jobs:
   create-ruleset:
     runs-on: ubuntu-latest
