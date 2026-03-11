@@ -11,10 +11,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+      - name: Download Godot Engine
+        run: |
+          wget https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
       - name: Install Godot
         run: |
-          wget https://downloads.tuxfamily.org/godotengine/4.3/Godot_v4.3-stable_linux.x86_64.zip
           unzip Godot_v4.3-stable_linux.x86_64.zip
 
       - name: Run Tests
