@@ -67,6 +67,9 @@ var _complete_overlay: Control = null
 ## Stored so the card entrance animation can target it.
 var _complete_card: Control = null
 
+## Fullscreen leaderboard overlay shown from the completion card or HUD menu.
+var _leaderboard_overlay: Control = null
+
 ## Confetti particle effect shown on puzzle completion.
 var _confetti: Object = null
 
@@ -1081,6 +1084,10 @@ func _build_complete_overlay() -> void:
 	new_btn.pressed.connect(_on_new_puzzle)
 	btn_row.add_child(new_btn)
 
+	var lb_btn := _make_hud_button("Leaderboard")
+	lb_btn.pressed.connect(_show_leaderboard_overlay)
+	btn_row.add_child(lb_btn)
+
 	# Confetti Node2D added after the card so it renders on top of everything.
 	_confetti = ConfettiEffect.new()
 	_hud.add_child(_confetti)
@@ -1416,6 +1423,8 @@ func _on_piece_released() -> void:
 func _show_complete() -> void:
 	_timer_running = false
 	_update_timer_label()
+	# Persist this run's score to the leaderboard.
+	GameState.save_score(_timer_elapsed, cols, rows)
 	if _complete_time_lbl != null:
 		_complete_time_lbl.text = "Time: %s" % _format_time(_timer_elapsed)
 	# Dismiss the zoom overlay so it does not cover the completion card.
@@ -1499,6 +1508,150 @@ func _play_piece_celebration_wave() -> void:
 		tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.25) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
 		tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.25)
+
+
+# ─── Leaderboard overlay ──────────────────────────────────────────────────────
+
+## Builds (or rebuilds) and shows the full-screen leaderboard overlay.
+## Displays scores for every known difficulty, with the current puzzle's
+## difficulty section scrolled into view first.
+func _show_leaderboard_overlay() -> void:
+	# Remove any previous overlay before rebuilding so content is always fresh.
+	if _leaderboard_overlay != null and is_instance_valid(_leaderboard_overlay):
+		_leaderboard_overlay.queue_free()
+	_leaderboard_overlay = null
+
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_hud.add_child(overlay)
+	_leaderboard_overlay = overlay
+
+	# Dimmed backdrop.
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.72)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(dim)
+
+	# Centred card.
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.12, 0.10, 0.22, 0.98)
+	ps.corner_radius_top_left     = 16
+	ps.corner_radius_top_right    = 16
+	ps.corner_radius_bottom_left  = 16
+	ps.corner_radius_bottom_right = 16
+	ps.border_width_left   = 2
+	ps.border_width_right  = 2
+	ps.border_width_top    = 2
+	ps.border_width_bottom = 2
+	ps.border_color = Color(0.55, 0.35, 0.90)
+	card.add_theme_stylebox_override("panel", ps)
+	card.custom_minimum_size = Vector2(UIScale.px(400), UIScale.px(320))
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(card)
+
+	var outer := MarginContainer.new()
+	outer.add_theme_constant_override("margin_left",   UIScale.px(32))
+	outer.add_theme_constant_override("margin_right",  UIScale.px(32))
+	outer.add_theme_constant_override("margin_top",    UIScale.px(24))
+	outer.add_theme_constant_override("margin_bottom", UIScale.px(24))
+	card.add_child(outer)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	outer.add_child(vbox)
+
+	# Title row with close button.
+	var title_row := HBoxContainer.new()
+	vbox.add_child(title_row)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "Leaderboard"
+	title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(28))
+	title_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title_lbl)
+
+	var close_btn := _make_hud_button("✕ Close")
+	close_btn.pressed.connect(func() -> void:
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+	)
+	title_row.add_child(close_btn)
+
+	var sep := HSeparator.new()
+	sep.add_theme_color_override("color", Color(0.35, 0.28, 0.55))
+	vbox.add_child(sep)
+
+	# Scrollable scores area.
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	var scores_vbox := VBoxContainer.new()
+	scores_vbox.add_theme_constant_override("separation", 18)
+	scores_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(scores_vbox)
+
+	# Build a section for each known difficulty.
+	var diffs: Array[Dictionary] = MainMenuScript.DIFFICULTIES
+	var any_scores := false
+	for d: Dictionary in diffs:
+		var d_cols: int = d["cols"]
+		var d_rows: int = d["rows"]
+		var entries: Array = GameState.get_scores_for_difficulty(d_cols, d_rows)
+		if entries.is_empty():
+			continue
+		any_scores = true
+
+		var diff_hdr := Label.new()
+		diff_hdr.text = "%s  (%d × %d)" % [d["label"], d_cols, d_rows]
+		diff_hdr.add_theme_font_size_override("font_size", UIScale.font_size(16))
+		diff_hdr.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
+		scores_vbox.add_child(diff_hdr)
+
+		for rank: int in range(entries.size()):
+			var e: Dictionary = entries[rank]
+			var row_hbox := HBoxContainer.new()
+			row_hbox.add_theme_constant_override("separation", 10)
+			scores_vbox.add_child(row_hbox)
+
+			var rank_lbl := Label.new()
+			rank_lbl.text = "#%d" % (rank + 1)
+			rank_lbl.custom_minimum_size = Vector2(UIScale.px(32), 0)
+			rank_lbl.add_theme_font_size_override("font_size", UIScale.font_size(14))
+			rank_lbl.add_theme_color_override("font_color",
+				Color(1.0, 0.85, 0.25) if rank == 0 else Color(0.65, 0.60, 0.80))
+			row_hbox.add_child(rank_lbl)
+
+			var time_lbl := Label.new()
+			time_lbl.text = GameState.format_score_time(e.get("time", 0.0))
+			time_lbl.add_theme_font_size_override("font_size", UIScale.font_size(14))
+			time_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+			time_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row_hbox.add_child(time_lbl)
+
+			var date_lbl := Label.new()
+			date_lbl.text = e.get("date", "")
+			date_lbl.add_theme_font_size_override("font_size", UIScale.font_size(13))
+			date_lbl.add_theme_color_override("font_color", Color(0.55, 0.52, 0.65))
+			row_hbox.add_child(date_lbl)
+
+	if not any_scores:
+		var empty_lbl := Label.new()
+		empty_lbl.text = "No scores yet – complete a puzzle to get on the board!"
+		empty_lbl.add_theme_font_size_override("font_size", UIScale.font_size(15))
+		empty_lbl.add_theme_color_override("font_color", Color(0.58, 0.55, 0.68))
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		scores_vbox.add_child(empty_lbl)
 
 
 ## Creates and returns an AudioStreamPlayer loaded with a generated pickup sound.
