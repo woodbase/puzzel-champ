@@ -177,6 +177,12 @@ var _box_view_title: Label = null
 ## Index of the sorting box currently displayed in the view overlay (-1 = none).
 var _open_box_index: int = -1
 
+## Floating popup shown when hovering a sorting-box button to preview stored pieces.
+var _box_hover_popup: Control = null
+
+## GridContainer inside the hover-preview popup that holds piece thumbnails.
+var _box_hover_popup_grid: GridContainer = null
+
 ## Tracks the portrait/landscape state from the last layout update.
 ## Used to detect orientation flips and trigger a puzzle rebuild so pieces
 ## always fit the newly-rotated screen.
@@ -2218,6 +2224,7 @@ func _build_sorting_boxes_panel() -> void:
 
 	_box_panel = panel
 	_build_box_view_overlay()
+	_build_box_hover_popup()
 
 
 ## Appends a styled button for the sorting box at box_idx to _box_vbox,
@@ -2253,6 +2260,8 @@ func _append_box_button(box_idx: int) -> void:
 
 	var i := box_idx
 	btn.pressed.connect(func() -> void: _open_box_view(i))
+	btn.mouse_entered.connect(func() -> void: _show_box_hover_preview(i, btn))
+	btn.mouse_exited.connect(_hide_box_hover_preview)
 	box.button = btn
 	_box_vbox.add_child(btn)
 	# Keep the button before the separator: index 0 is the header label,
@@ -2408,10 +2417,130 @@ func _build_box_view_overlay() -> void:
 	_box_view_overlay = overlay
 
 
+## Builds the lightweight hover-preview popup used to display piece thumbnails
+## when the player hovers over a sorting-box button.  Hidden by default.
+func _build_box_hover_popup() -> void:
+	var popup := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color                   = Color(0.10, 0.09, 0.18, 0.95)
+	ps.corner_radius_top_left     = 6
+	ps.corner_radius_top_right    = 6
+	ps.corner_radius_bottom_left  = 6
+	ps.corner_radius_bottom_right = 6
+	ps.border_width_left   = 1
+	ps.border_width_right  = 1
+	ps.border_width_top    = 1
+	ps.border_width_bottom = 1
+	ps.border_color = Color(0.55, 0.35, 0.90)
+	popup.add_theme_stylebox_override("panel", ps)
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Anchor to top-left so size is content-driven and position sets the corner.
+	popup.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	popup.visible = false
+	_hud.add_child(popup)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left",   6)
+	margin.add_theme_constant_override("margin_right",  6)
+	margin.add_theme_constant_override("margin_top",    6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(vbox)
+
+	var title_lbl := Label.new()
+	title_lbl.text = ""
+	title_lbl.add_theme_font_size_override("font_size", 11)
+	title_lbl.add_theme_color_override("font_color", Color(0.85, 0.78, 1.0))
+	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(title_lbl)
+	popup.set_meta("title_lbl", title_lbl)
+
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 4)
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(grid)
+	_box_hover_popup_grid = grid
+
+	_box_hover_popup = popup
+
+
+## Shows a small floating preview of piece thumbnails when hovering a box button.
+func _show_box_hover_preview(box_idx: int, btn: Button) -> void:
+	if _box_hover_popup == null \
+			or box_idx < 0 \
+			or box_idx >= _sorting_boxes.size():
+		return
+
+	var box: Dictionary = _sorting_boxes[box_idx]
+	var box_pieces: Array = box.pieces
+
+	# Update title label.
+	var title_lbl := _box_hover_popup.get_meta("title_lbl") as Label
+	if title_lbl != null:
+		title_lbl.text = "%s  (%d piece%s)" % [
+			box.name,
+			box_pieces.size(),
+			"" if box_pieces.size() == 1 else "s",
+		]
+
+	# Rebuild thumbnail grid.
+	for child in _box_hover_popup_grid.get_children():
+		child.queue_free()
+
+	if box_pieces.is_empty():
+		_box_hover_popup_grid.columns = 1
+		var empty_lbl := Label.new()
+		empty_lbl.text = "Empty"
+		empty_lbl.add_theme_font_size_override("font_size", 10)
+		empty_lbl.add_theme_color_override("font_color", Color(0.55, 0.50, 0.75))
+		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_box_hover_popup_grid.add_child(empty_lbl)
+	else:
+		var max_shown: int = mini(9, box_pieces.size())
+		_box_hover_popup_grid.columns = mini(3, max_shown)
+		for pi in max_shown:
+			var piece = box_pieces[pi]
+			if not is_instance_valid(piece):
+				continue
+			var sprite := piece.get_node_or_null("Sprite2D") as Sprite2D
+			var thumb := TextureRect.new()
+			thumb.custom_minimum_size = Vector2(48, 48)
+			thumb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if sprite != null and sprite.texture != null:
+				thumb.texture      = sprite.texture
+				thumb.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+				thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_box_hover_popup_grid.add_child(thumb)
+
+	# Position the popup to the right of the box panel, aligned with the button.
+	var btn_rect := btn.get_global_rect()
+	_box_hover_popup.position = Vector2(
+		REFERENCE_PANEL_MARGIN + BOX_PANEL_W + 6.0,
+		btn_rect.position.y
+	)
+	_box_hover_popup.visible = true
+
+
+## Hides the sorting-box hover-preview popup.
+func _hide_box_hover_preview() -> void:
+	if _box_hover_popup != null:
+		_box_hover_popup.visible = false
+
+
 ## Opens the box-view overlay for the sorting box at box_idx.
 func _open_box_view(box_idx: int) -> void:
 	if box_idx < 0 or box_idx >= _sorting_boxes.size():
 		return
+	_hide_box_hover_preview()
 	_open_box_index = box_idx
 	_refresh_box_view()
 	if _box_view_overlay != null:
@@ -2593,3 +2722,4 @@ func _clear_all_sorting_boxes() -> void:
 		if btn != null and is_instance_valid(btn):
 			btn.text = "%s [0]" % box.name
 	_close_box_view()
+	_hide_box_hover_preview()
