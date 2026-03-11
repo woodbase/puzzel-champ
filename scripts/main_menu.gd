@@ -606,7 +606,7 @@ func _make_button(label_text: String) -> Button:
 ## differentiate it from the standard Start button.
 func _make_resume_button() -> Button:
 	var btn := Button.new()
-	btn.text = "▶  Resume Saved Puzzle  (Slot 1)"
+	btn.text = "▶  Resume Saved Puzzle"
 	btn.add_theme_color_override("font_color", Color(0.90, 1.00, 0.92))
 	var portrait := UIScale.is_portrait()
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))

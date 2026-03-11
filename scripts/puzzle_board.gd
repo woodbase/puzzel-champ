@@ -1749,8 +1749,8 @@ func _save_puzzle_state() -> void:
 	var pieces_data: Array = []
 	for piece in _pieces:
 		if not is_instance_valid(piece):
-			pieces_data.append({"pos_x": 0.0, "pos_y": 0.0, "is_locked": false})
-			continue
+			push_warning("PuzzleBoard: cannot save – a piece node is no longer valid.")
+			return
 		pieces_data.append({
 			"pos_x": piece.position.x,
 			"pos_y": piece.position.y,
@@ -1836,18 +1836,17 @@ func _apply_saved_state() -> void:
 ## slot consistent with the current game state.
 func _clear_save() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
-		var abs_path := ProjectSettings.globalize_path(SAVE_PATH)
-		DirAccess.remove_absolute(abs_path)
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 	GameState.has_save = false
 	_update_save_slot_label(false)
 
 
 ## Updates the save-slot indicator label in the HUD.
-## *saved* = true shows "💾 Slot 1", false hides the label.
+## *saved* = true shows "💾 Saved", false hides the label.
 func _update_save_slot_label(saved: bool) -> void:
 	if _save_slot_label == null:
 		return
-	_save_slot_label.text = "💾 Slot 1"
+	_save_slot_label.text = "💾 Saved"
 	_save_slot_label.visible = saved
 
 
