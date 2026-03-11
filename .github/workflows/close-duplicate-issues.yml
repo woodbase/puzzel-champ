@@ -2,6 +2,11 @@ name: Close Duplicate Issues
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/close-duplicate-issues.yml'
 
 permissions:
   issues: write
@@ -39,7 +44,7 @@ jobs:
             const duplicates = [
               // Milestone 1 – Core Gameplay Stabilization (all implemented)
               { number: 145, reason: 'Puzzle piece generation is fully implemented in `scripts/puzzle_generator.gd`, supporting both square and jigsaw piece shapes with polygon-based generation.' },
-              { number: 146, reason: 'Piece snapping logic is implemented in `scripts/puzzle_board.gd` and `scripts/puzzle_piece.gd` with a 35 % snap-distance threshold and grid-position validation.' },
+              { number: 146, reason: 'Piece snapping logic is implemented in `scripts/puzzle_board.gd` and `scripts/puzzle_piece.gd` with a 35% snap-distance threshold and grid-position validation.' },
               { number: 147, reason: 'Incorrect placements are already prevented: pieces can only snap to their exact correct grid slot; any other release leaves them freely draggable.' },
               { number: 148, reason: 'Pieces are locked in place (`is_locked = true`) when correctly snapped, preventing accidental movement, with audio and visual snap feedback.' },
               { number: 149, reason: 'Puzzle completion is detected in `on_piece_placed()` by comparing `_placed_pieces` against `_total_pieces`, triggering the victory overlay.' },
@@ -73,7 +78,7 @@ jobs:
               // Milestone 6 – Animation Exploration (all implemented)
               { number: 172, reason: 'A board-entry loading animation (image fade-in + staggered piece scale-in with bounce tweens) runs each time a puzzle is built, in `_play_board_entry_animation()`.' },
               { number: 173, reason: 'Victory animations are implemented: confetti particles, border glow, and a staggered piece celebration wave all play on puzzle completion.' },
-              { number: 174, reason: 'The animation system is implemented using Godot\'s built-in `Tween` API throughout `scripts/puzzle_board.gd` and `scripts/puzzle_piece.gd`.' },
+              { number: 174, reason: "The animation system is implemented using Godot's built-in `Tween` API throughout `scripts/puzzle_board.gd` and `scripts/puzzle_piece.gd`." },
               // Milestone 7 – Content (all implemented)
               { number: 175, reason: 'Multiple built-in puzzle images are included in `gfx/puzzles/`, selectable from the gallery panel on the main menu.' },
               { number: 176, reason: 'Difficulty progression is fully implemented: Easy → Medium → Hard → Expert with 6 / 12 / 24 / 48 pieces following a 2× exponential step.' },
