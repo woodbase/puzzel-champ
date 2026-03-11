@@ -27,12 +27,17 @@ var _pickup_player: AudioStreamPlayer = null
 ## AudioStreamPlayer used to play the snap sound effect.
 var _snap_player: AudioStreamPlayer = null
 
+## AudioStreamPlayer used to play the puzzle-completion fanfare.
+var _complete_player: AudioStreamPlayer = null
+
 
 func _ready() -> void:
 	_pickup_player = _create_pickup_audio_player()
 	add_child(_pickup_player)
 	_snap_player = _create_snap_audio_player()
 	add_child(_snap_player)
+	_complete_player = _create_complete_audio_player()
+	add_child(_complete_player)
 
 
 ## Clears the current puzzle and builds a new one from the given texture.
@@ -119,6 +124,8 @@ func _on_piece_placed() -> void:
 	if feedback_audio and _snap_player != null:
 		_snap_player.play()
 	if _placed_count >= _pieces.size():
+		if feedback_audio and _complete_player != null:
+			_complete_player.play()
 		puzzle_complete.emit()
 
 
@@ -199,6 +206,55 @@ func _generate_snap_sound() -> AudioStreamWAV:
 	stream.mix_rate  = sample_rate
 	stream.stereo    = false
 	stream.data      = data
+	return stream
+
+
+## Creates and returns an AudioStreamPlayer loaded with a generated completion fanfare.
+func _create_complete_audio_player() -> AudioStreamPlayer:
+	var player := AudioStreamPlayer.new()
+	player.volume_db = -3.0
+	player.stream = _generate_completion_sound()
+	return player
+
+
+## Generates a celebratory ascending-arpeggio fanfare as a raw AudioStreamWAV.
+## Four notes of a C-major chord (C5→E5→G5→C6) are played in sequence, each
+## with a soft decay, giving a sound clearly distinct from the short snap chirp.
+func _generate_completion_sound() -> AudioStreamWAV:
+	var sample_rate: int = 22050
+	var duration: float  = 1.0
+	var num_samples: int = int(sample_rate * duration)
+
+	# Ascending C-major arpeggio: C5, E5, G5, C6.
+	var notes: Array[float] = [
+		523.25,  # C5
+		659.25,  # E5
+		783.99,  # G5
+		1046.50, # C6
+	]
+	var note_duration: float = duration / float(notes.size())
+
+	var data := PackedByteArray()
+	data.resize(num_samples * 2)  # 16-bit mono = 2 bytes per sample.
+
+	for i in range(num_samples):
+		var t: float        = float(i) / float(sample_rate)
+		var note_index: int = clampi(int(t / note_duration), 0, notes.size() - 1)
+		var note_t: float   = t - note_index * note_duration
+		var freq: float     = notes[note_index]
+		# Gentle per-note decay so each note is crisp at its onset.
+		var envelope: float = exp(-note_t * 6.0)
+		var sample: int     = int(sin(TAU * freq * t) * envelope * 28000.0)
+		sample = clampi(sample, -32768, 32767)
+		# Store as little-endian signed 16-bit.
+		data[i * 2]     = sample & 0xFF
+		data[i * 2 + 1] = (sample >> 8) & 0xFF
+
+	var stream := AudioStreamWAV.new()
+	stream.format   = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo   = false
+	stream.data     = data
 	return stream
 
 
