@@ -18,9 +18,15 @@ const COLOURS: Array = [
 ## How long (seconds) new particles are spawned after start() is called.
 const SPAWN_DURATION: float = 4.0
 
-## Particles spawned per second during the spawn window.
+## Particles spawned per second during the spawn window (desktop).
 ## Increased for more festive effect.
 const SPAWN_RATE: float = 70.0
+
+## Reduced particles per second used on mobile to ease rendering pressure.
+const SPAWN_RATE_MOBILE: float = 35.0
+
+## Shorter spawn window on mobile to limit the maximum live particle count.
+const SPAWN_DURATION_MOBILE: float = 2.5
 
 ## Downward acceleration applied to every particle (pixels/s²).
 const GRAVITY: float = 280.0
@@ -48,11 +54,21 @@ var _particles: Array = []
 var _spawn_timer: float = 0.0
 var _spawn_accum: float = 0.0
 var _screen_size: Vector2 = Vector2(1152.0, 648.0)
+## Active spawn-rate and duration, chosen based on device type in start().
+var _active_spawn_rate: float = SPAWN_RATE
+var _active_spawn_duration: float = SPAWN_DURATION
 
 
 ## Begin the effect.  Call with the current viewport size.
 func start(screen_size: Vector2) -> void:
 	_screen_size = screen_size
+	# Apply lighter particle budget on mobile to keep the frame rate stable.
+	if GameState.is_mobile:
+		_active_spawn_rate     = SPAWN_RATE_MOBILE
+		_active_spawn_duration = SPAWN_DURATION_MOBILE
+	else:
+		_active_spawn_rate     = SPAWN_RATE
+		_active_spawn_duration = SPAWN_DURATION
 	_spawn_timer = 0.0
 	_spawn_accum = 0.0
 	_particles.clear()
@@ -72,9 +88,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	# Spawn new particles while within the spawn window.
-	if _spawn_timer < SPAWN_DURATION:
+	if _spawn_timer < _active_spawn_duration:
 		_spawn_timer += delta
-		_spawn_accum += SPAWN_RATE * delta
+		_spawn_accum += _active_spawn_rate * delta
 		while _spawn_accum >= 1.0:
 			_spawn_particle()
 			_spawn_accum -= 1.0
@@ -94,7 +110,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 	# Once spawning stops and all particles have fallen off-screen, idle.
-	if _spawn_timer >= SPAWN_DURATION and _particles.is_empty():
+	if _spawn_timer >= _active_spawn_duration and _particles.is_empty():
 		set_process(false)
 
 
