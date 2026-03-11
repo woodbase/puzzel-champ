@@ -115,13 +115,20 @@ const _TAB_HEAD_EDGE: float = 0.45
 const _TAB_NECK_DEPTH: float = 0.5
 const _TAB_NECK_UPPER: float = 0.8
 const _TAB_HEAD_BULGE: float = 1.3
+## Bezier subdivision steps per curve segment on desktop.
 const _BEZIER_STEPS: int = 5
+## Reduced steps for mobile to lower polygon complexity and fill cost.
+const _BEZIER_STEPS_MOBILE: int = 3
 
 
 # Appends Bezier-sampled tab points between p_start and p_end.
 func _add_tab_points(polygon: PackedVector2Array, p_start: Vector2, p_end: Vector2, edge_type: int, tab_depth: float) -> void:
 	if edge_type == EdgeType.FLAT:
 		return
+
+	# Use fewer curve segments on mobile to reduce polygon vertex count and
+	# the per-piece scanline fill cost without noticeably changing piece shape.
+	var steps: int = _BEZIER_STEPS_MOBILE if GameState.is_mobile else _BEZIER_STEPS
 
 	var along: Vector2 = p_end - p_start
 	var length: float = along.length()
@@ -150,14 +157,14 @@ func _add_tab_points(polygon: PackedVector2Array, p_start: Vector2, p_end: Vecto
 	var b3_p3 := p_start + t_vec * (length * (1.0 - _TAB_FLAT))
 
 	polygon.append(tab_start)
-	for i in range(1, _BEZIER_STEPS + 1):
-		var tv: float = float(i) / float(_BEZIER_STEPS)
+	for i in range(1, steps + 1):
+		var tv: float = float(i) / float(steps)
 		polygon.append(_cubic_bezier(b1_p0, b1_p1, b1_p2, b1_p3, tv))
-	for i in range(1, _BEZIER_STEPS + 1):
-		var tv: float = float(i) / float(_BEZIER_STEPS)
+	for i in range(1, steps + 1):
+		var tv: float = float(i) / float(steps)
 		polygon.append(_cubic_bezier(b2_p0, b2_p1, b2_p2, b2_p3, tv))
-	for i in range(1, _BEZIER_STEPS + 1):
-		var tv: float = float(i) / float(_BEZIER_STEPS)
+	for i in range(1, steps + 1):
+		var tv: float = float(i) / float(steps)
 		polygon.append(_cubic_bezier(b3_p0, b3_p1, b3_p2, b3_p3, tv))
 
 
@@ -244,6 +251,8 @@ func _fill_polygon(image: Image, polygon: PackedVector2Array) -> void:
 		while idx + 1 < intersections.size():
 			var x_start := maxi(0, int(ceil(intersections[idx])))
 			var x_end := mini(width - 1, int(floor(intersections[idx + 1])))
-			for x in range(x_start, x_end + 1):
-				image.set_pixel(x, y, Color.WHITE)
+			# fill_rect is a single C++ call and vastly outperforms a GDScript
+			# pixel loop, especially for wide spans on mobile hardware.
+			if x_end >= x_start:
+				image.fill_rect(Rect2i(x_start, y, x_end - x_start + 1, 1), Color.WHITE)
 			idx += 2

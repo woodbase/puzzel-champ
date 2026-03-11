@@ -1188,8 +1188,11 @@ func _build_puzzle() -> void:
 
 	# Cap source resolution so per-piece textures stay close to on-screen size,
 	# reducing GPU bandwidth/memory on mobile while keeping a modest oversample.
-	var max_source_w: int = int(ceil(screen_piece_w * SOURCE_OVERSAMPLE))
-	var max_source_h: int = int(ceil(screen_piece_h * SOURCE_OVERSAMPLE))
+	# Mobile uses a tighter cap (1.0×) to minimise texture memory; desktop keeps
+	# the 1.35× oversample so zoomed-in views remain sharper.
+	var oversample: float = 1.0 if GameState.is_mobile else SOURCE_OVERSAMPLE
+	var max_source_w: int = int(ceil(screen_piece_w * oversample))
+	var max_source_h: int = int(ceil(screen_piece_h * oversample))
 	if max_source_w > 0:
 		image_piece_w = min(image_piece_w, max_source_w)
 	if max_source_h > 0:
@@ -1198,10 +1201,14 @@ func _build_puzzle() -> void:
 	# Resize the image to be exactly cols × image_piece_w wide and
 	# rows × image_piece_h tall so that integer-division truncation cannot
 	# leave a gap at the right or bottom edge of the assembled puzzle.
+	# On mobile, BILINEAR is used instead of LANCZOS to significantly reduce
+	# build time; quality is indistinguishable at the small screen-space sizes
+	# used by mobile puzzles.
 	var target_img_w: int = cols * image_piece_w
 	var target_img_h: int = rows * image_piece_h
 	if image.get_width() != target_img_w or image.get_height() != target_img_h:
-		image.resize(target_img_w, target_img_h, Image.INTERPOLATE_LANCZOS)
+		var interp: int = Image.INTERPOLATE_BILINEAR if GameState.is_mobile else Image.INTERPOLATE_LANCZOS
+		image.resize(target_img_w, target_img_h, interp)
 
 	# Centre the puzzle grid on the available canvas area.
 	_puzzle_origin = Vector2(
