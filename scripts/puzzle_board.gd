@@ -79,8 +79,10 @@ var _building: bool = false
 ## Currently selected piece shape key (mirrors GameState.piece_shape).
 var _piece_shape: String = "jigsaw"
 
-## Size of each puzzle piece in screen-space units (set during _build_puzzle).
-var _piece_size: int = 0
+## Screen-space size of each puzzle piece cell (width × height).
+## Preserved as a Vector2 so non-square images can be displayed without
+## distortion; x = width per column, y = height per row.
+var _piece_size: Vector2 = Vector2.ZERO
 
 ## Top-left corner of the puzzle grid in board-local coordinates.
 ## Used to centre the board on screen and kept so derived calculations
@@ -297,20 +299,20 @@ func _process(delta: float) -> void:
 ## Draws a highlight rectangle at the target position of the dragged piece when
 ## it is within HIGHLIGHT_DISTANCE of that target.
 func _draw() -> void:
-	if _dragged_piece == null or not GameState.feedback_visual or _piece_size <= 0:
+	if _dragged_piece == null or not GameState.feedback_visual or _piece_size == Vector2.ZERO:
 		return
 	var target_local: Vector2 = _dragged_piece.correct_position
 	var target_global: Vector2 = to_global(target_local)
 	var dist: float = _dragged_piece.global_position.distance_to(target_global)
-	# Highlight radius is 50 % of the piece side, which is always larger than the
-	# 35 % snap threshold so the green glow appears before the piece locks in place.
-	var highlight_distance: float = _piece_size * 0.5
+	# Highlight radius is 50 % of the shorter piece side, which is always larger
+	# than the 35 % snap threshold so the green glow appears before locking.
+	var highlight_distance: float = minf(_piece_size.x, _piece_size.y) * 0.5
 	if dist >= highlight_distance:
 		return
 	# Alpha increases as the piece approaches the target (0 at edge → 1 at centre).
 	var alpha: float = 1.0 - (dist / highlight_distance)
-	var half: float = _piece_size * 0.5
-	var rect := Rect2(target_local - Vector2(half, half), Vector2(_piece_size, _piece_size))
+	var half: Vector2 = _piece_size * 0.5
+	var rect := Rect2(target_local - half, _piece_size)
 	draw_rect(rect, Color(0.2, 0.85, 0.2, alpha * 0.25), true)
 	draw_rect(rect, Color(0.2, 0.95, 0.2, alpha * 0.80), false)
 
@@ -1139,15 +1141,12 @@ func _build_puzzle() -> void:
 
 	var viewport_size := get_viewport_rect().size
 
-	# Scale the puzzle to fill 90 % of the available area below the HUD bar.
-	# Use the largest square cell size that lets all columns and rows fit.
+	# Fit the image into 90 % of the available area while preserving its aspect
+	# ratio.  Using rectangular cells (screen_piece_w may differ from
+	# screen_piece_h) ensures the assembled puzzle always shows the complete image
+	# without stretching or squishing.
 	var avail_w: float = viewport_size.x * 0.90
 	var avail_h: float = (viewport_size.y - HUD_H) * 0.90
-	var screen_piece_size: float = minf(avail_w / float(cols), avail_h / float(rows))
-	if screen_piece_size <= 0.0:
-		push_error("PuzzleBoard: screen_piece_size must be positive (got %.2f)." % screen_piece_size)
-		return
-	_piece_size = int(screen_piece_size)
 
 	var image := source_texture.get_image()
 	if image == null:
@@ -1158,36 +1157,62 @@ func _build_puzzle() -> void:
 	var img_w := image.get_width()
 	var img_h := image.get_height()
 
-	# Base piece size in image-space (square cells, uses the smaller dimension).
-	var image_piece_size: int = min(img_w / cols, img_h / rows)
-	if image_piece_size <= 0:
+	var img_aspect: float = float(img_w) / float(img_h) if img_h > 0 else 1.0
+	var avail_aspect: float = avail_w / avail_h if avail_h > 0.0 else 1.0
+	var display_w: float
+	var display_h: float
+	if img_aspect >= avail_aspect:
+		# Image is wider (relative to available area): fit to width.
+		display_w = avail_w
+		display_h = avail_w / img_aspect
+	else:
+		# Image is taller: fit to height.
+		display_h = avail_h
+		display_w = avail_h * img_aspect
+
+	var screen_piece_w: float = display_w / float(cols)
+	var screen_piece_h: float = display_h / float(rows)
+	if screen_piece_w <= 0.0 or screen_piece_h <= 0.0:
+		push_error("PuzzleBoard: screen piece dimensions must be positive (got w=%.2f h=%.2f)." % [screen_piece_w, screen_piece_h])
+		return
+	_piece_size = Vector2(screen_piece_w, screen_piece_h)
+
+	# Natural piece cell size in image space.  Using the actual per-column and
+	# per-row pixel counts avoids forcing the image into square cells and thereby
+	# preserves the original aspect ratio of the source image.
+	var image_piece_w: int = img_w / cols
+	var image_piece_h: int = img_h / rows
+	if image_piece_w <= 0 or image_piece_h <= 0:
 		push_error("PuzzleBoard: source image too small for grid (piece size <= 0).")
 		return
 
 	# Cap source resolution so per-piece textures stay close to on-screen size,
 	# reducing GPU bandwidth/memory on mobile while keeping a modest oversample.
-	var max_source_piece: int = int(ceil(screen_piece_size * SOURCE_OVERSAMPLE))
-	if max_source_piece > 0:
-		image_piece_size = min(image_piece_size, max_source_piece)
+	var max_source_w: int = int(ceil(screen_piece_w * SOURCE_OVERSAMPLE))
+	var max_source_h: int = int(ceil(screen_piece_h * SOURCE_OVERSAMPLE))
+	if max_source_w > 0:
+		image_piece_w = min(image_piece_w, max_source_w)
+	if max_source_h > 0:
+		image_piece_h = min(image_piece_h, max_source_h)
 
-	# Resize the image to be exactly cols × image_piece_size wide and
-	# rows × image_piece_size tall so that integer-division truncation cannot
+	# Resize the image to be exactly cols × image_piece_w wide and
+	# rows × image_piece_h tall so that integer-division truncation cannot
 	# leave a gap at the right or bottom edge of the assembled puzzle.
-	var target_img_w: int = cols * image_piece_size
-	var target_img_h: int = rows * image_piece_size
+	var target_img_w: int = cols * image_piece_w
+	var target_img_h: int = rows * image_piece_h
 	if image.get_width() != target_img_w or image.get_height() != target_img_h:
 		image.resize(target_img_w, target_img_h, Image.INTERPOLATE_LANCZOS)
 
 	# Centre the puzzle grid on the available canvas area.
-	var puzzle_w: float = screen_piece_size * float(cols)
-	var puzzle_h: float = screen_piece_size * float(rows)
 	_puzzle_origin = Vector2(
-		(viewport_size.x - puzzle_w) * 0.5,
-		HUD_H + ((viewport_size.y - HUD_H) - puzzle_h) * 0.5
+		(viewport_size.x - display_w) * 0.5,
+		HUD_H + ((viewport_size.y - HUD_H) - display_h) * 0.5
 	)
 
-	# Scale factor to resize sprites from image-space to screen-space.
-	var piece_scale: float = screen_piece_size / float(image_piece_size) if image_piece_size > 0 else 1.0
+	# Uniform scale factor from image-space to screen-space.
+	# Because the display dimensions preserve the image aspect ratio, the same
+	# factor applies to both axes: scale = display_w / img_w = display_h / img_h.
+	var piece_scale: float = display_w / float(img_w) if img_w > 0 else 1.0
 
 	var piece_data_array: Array = _generator.generate_edges(cols, rows)
 	_total_pieces  = piece_data_array.size()
@@ -1211,14 +1236,14 @@ func _build_puzzle() -> void:
 		var row: int = pd.grid_pos.y
 
 		# Generate polygon and masked texture in image space.
-		var polygon: PackedVector2Array = _generator.generate_piece_polygon(pd, image_piece_size, shape_enum)
-		var region  := Rect2i(col * image_piece_size, row * image_piece_size, image_piece_size, image_piece_size)
+		var polygon: PackedVector2Array = _generator.generate_piece_polygon(pd, image_piece_w, image_piece_h, shape_enum)
+		var region  := Rect2i(col * image_piece_w, row * image_piece_h, image_piece_w, image_piece_h)
 		var texture: ImageTexture = _generator.create_piece_texture(image, region, polygon, shape_enum)
 
 		# Correct world position: centre of the grid cell in screen space.
 		var correct_pos := Vector2(
-			_puzzle_origin.x + (col + 0.5) * screen_piece_size,
-			_puzzle_origin.y + (row + 0.5) * screen_piece_size
+			_puzzle_origin.x + (col + 0.5) * screen_piece_w,
+			_puzzle_origin.y + (row + 0.5) * screen_piece_h
 		)
 
 		var piece := PIECE_SCENE.instantiate()
@@ -1229,24 +1254,25 @@ func _build_puzzle() -> void:
 		# Scale the sprite so it displays at screen-space size.
 		sprite.scale = Vector2(piece_scale, piece_scale)
 
-		# Collision shape sized to the screen-space piece.
+		# Collision shape sized to the screen-space piece cell.
 		var col_shape  := piece.get_node("CollisionShape2D") as CollisionShape2D
 		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = Vector2(screen_piece_size, screen_piece_size)
+		rect_shape.size = Vector2(screen_piece_w, screen_piece_h)
 		col_shape.shape = rect_shape
 
 		piece.correct_position = correct_pos
-		# Scale snap threshold to the actual screen-space piece size so snapping
-		# feels consistent regardless of grid size or screen resolution.
-		# 35 % of the piece side is tight enough to prevent false snaps to
+		# Scale snap threshold to the shorter side of the screen-space piece so
+		# snapping feels consistent regardless of grid size, resolution, or image
+		# aspect ratio.  35 % is tight enough to prevent accidental snaps to
 		# adjacent slots while remaining easy to hit intentionally.
-		piece.snap_distance = screen_piece_size * 0.35
+		piece.snap_distance = minf(screen_piece_w, screen_piece_h) * 0.35
 
 		# Spawn randomly; keep pieces below the HUD bar.
-		var half := _piece_size * 0.5
+		var spawn_half_w := _piece_size.x * 0.5
+		var spawn_half_h := _piece_size.y * 0.5
 		var spawn_pos := Vector2(
-			randf_range(half, viewport_size.x - half),
-			randf_range(HUD_H + half, viewport_size.y - half)
+			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
+			randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_half_h)
 		)
 		piece.position = spawn_pos
 		_pieces_initial_positions.append(spawn_pos)
@@ -1435,8 +1461,8 @@ func _show_complete() -> void:
 		_complete_player.play()
 	if GameState.feedback_visual and _confetti != null:
 		_confetti.start(get_viewport().get_visible_rect().size)
-	if GameState.feedback_visual and _glow_effect != null and _piece_size > 0:
-		var puzzle_rect := Rect2(_puzzle_origin, Vector2(cols * _piece_size, rows * _piece_size))
+	if GameState.feedback_visual and _glow_effect != null and _piece_size != Vector2.ZERO:
+		var puzzle_rect := Rect2(_puzzle_origin, Vector2(cols * _piece_size.x, rows * _piece_size.y))
 		_glow_effect.start(puzzle_rect)
 		_play_piece_celebration_wave()
 
@@ -1446,7 +1472,7 @@ func _show_complete() -> void:
 ## locked pieces, staggered by their grid distance from the top-left corner.
 ## Enhanced with varied timing and stronger visual impact.
 func _play_piece_celebration_wave() -> void:
-	if _piece_size <= 0:
+	if _piece_size == Vector2.ZERO:
 		return
 	for child: Node in get_tree().get_nodes_in_group("puzzle_pieces"):
 		# All nodes in "puzzle_pieces" are PuzzlePiece Area2D instances; guard
@@ -1459,8 +1485,8 @@ func _play_piece_celebration_wave() -> void:
 		var correct_pos = child.get("correct_position")
 		if correct_pos == null:
 			continue
-		var col: int = int((correct_pos.x - _puzzle_origin.x) / float(_piece_size))
-		var row: int = int((correct_pos.y - _puzzle_origin.y) / float(_piece_size))
+		var col: int = int((correct_pos.x - _puzzle_origin.x) / _piece_size.x)
+		var row: int = int((correct_pos.y - _puzzle_origin.y) / _piece_size.y)
 		# Varied stagger based on position creates a more dynamic wave.
 		var delay: float = float(col + row) * 0.048 + randf_range(0.0, 0.015)
 		var tween := create_tween()
@@ -2178,10 +2204,11 @@ func _remove_piece_from_box(box_idx: int, piece_idx: int) -> void:
 	if is_instance_valid(piece):
 		piece.visible = true
 		var vp := get_viewport_rect().size
-		var half: float = float(_piece_size) * 0.5 if _piece_size > 0 else 40.0
+		var half_w: float = _piece_size.x * 0.5 if _piece_size != Vector2.ZERO else 40.0
+		var half_h: float = _piece_size.y * 0.5 if _piece_size != Vector2.ZERO else 40.0
 		piece.position = Vector2(
-			randf_range(half, vp.x - half),
-			randf_range(HUD_H + half, vp.y - half)
+			randf_range(half_w, vp.x - half_w),
+			randf_range(HUD_H + half_h, vp.y - half_h)
 		)
 
 	var btn: Button = box.get("button")

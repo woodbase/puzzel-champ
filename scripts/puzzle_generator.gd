@@ -60,37 +60,41 @@ func generate_edges(cols: int, rows: int) -> Array:
 const TAB_DEPTH_RATIO: float = 0.25
 
 ## Generates a polygon for the given piece.
+## piece_w and piece_h are the cell dimensions in image-space pixels (may differ
+## when the source image has a non-square aspect ratio).
 ## shape selects the piece style: PieceShape.SQUARE or PieceShape.JIGSAW.
 ## Returns a PackedVector2Array polygon.
-func generate_piece_polygon(piece_data: PieceData, piece_size: int, shape: int = PieceShape.JIGSAW) -> PackedVector2Array:
+func generate_piece_polygon(piece_data: PieceData, piece_w: int, piece_h: int, shape: int = PieceShape.JIGSAW) -> PackedVector2Array:
 	if shape == PieceShape.SQUARE:
-		return _square_polygon(piece_size)
-	return _jigsaw_polygon(piece_data, piece_size)
+		return _square_polygon(piece_w, piece_h)
+	return _jigsaw_polygon(piece_data, piece_w, piece_h)
 
 
-## Returns a plain square polygon with no tabs.
-func _square_polygon(piece_size: int) -> PackedVector2Array:
-	var s := float(piece_size)
+## Returns a rectangular polygon covering the full cell (no tabs).
+func _square_polygon(piece_w: int, piece_h: int) -> PackedVector2Array:
+	var w := float(piece_w)
+	var h := float(piece_h)
 	var polygon := PackedVector2Array()
 	polygon.append(Vector2(0.0, 0.0))
-	polygon.append(Vector2(s, 0.0))
-	polygon.append(Vector2(s, s))
-	polygon.append(Vector2(0.0, s))
+	polygon.append(Vector2(w, 0.0))
+	polygon.append(Vector2(w, h))
+	polygon.append(Vector2(0.0, h))
 	return polygon
 
 
 ## Generates a jigsaw polygon for the given piece.
-## tab_depth = piece_size * TAB_DEPTH_RATIO; edges are built in order: top, right, bottom, left.
-func _jigsaw_polygon(piece_data: PieceData, piece_size: int) -> PackedVector2Array:
+## tab_depth = min(piece_w, piece_h) * TAB_DEPTH_RATIO; edges are built in order: top, right, bottom, left.
+func _jigsaw_polygon(piece_data: PieceData, piece_w: int, piece_h: int) -> PackedVector2Array:
 	var polygon := PackedVector2Array()
-	var tab_depth: float = piece_size * TAB_DEPTH_RATIO
-	var s: float = float(piece_size)
+	var tab_depth: float = min(piece_w, piece_h) * TAB_DEPTH_RATIO
+	var w: float = float(piece_w)
+	var h: float = float(piece_h)
 
 	var corners := [
 		Vector2(0.0, 0.0),
-		Vector2(s, 0.0),
-		Vector2(s, s),
-		Vector2(0.0, s),
+		Vector2(w, 0.0),
+		Vector2(w, h),
+		Vector2(0.0, h),
 	]
 	var edge_names := ["top", "right", "bottom", "left"]
 
@@ -177,7 +181,7 @@ func create_piece_texture(image: Image, region: Rect2i, polygon: PackedVector2Ar
 	# Padding = maximum extent an OUT tab protrudes beyond the piece bounding box.
 	var padding: int
 	if shape == PieceShape.JIGSAW:
-		var tab_depth := float(region.size.x) * TAB_DEPTH_RATIO
+		var tab_depth := float(min(region.size.x, region.size.y)) * TAB_DEPTH_RATIO
 		padding = int(ceil(tab_depth * _TAB_HEAD_BULGE))
 	else:
 		padding = 0
