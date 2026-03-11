@@ -16,8 +16,12 @@ jobs:
         run: |
           wget https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip
           unzip Godot_v4.6-stable_linux.x86_64.zip
-
-      - name: Run Tests
+      - name: Install gdUnit4
         run: |
-          ./Godot_v4.6-stable_linux.x86_64 --headless \
-          -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a run
+           wget https://github.com/MikeSchulze/gdUnit4/releases/latest/download/gdUnit4.zip
+           unzip gdUnit4.zip -d addons/gdUnit4
+
+       - name: Run Tests
+         run: |
+           ./Godot_v4.6-stable_linux.x86_64 --headless \
+           -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a run
