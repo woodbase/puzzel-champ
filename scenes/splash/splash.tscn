@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://splash_scene"]
+[gd_scene load_steps=4 format=3 uid="uid://splash_scene"]
 
 [ext_resource type="Script" path="res://scripts/ui/splash.gd" id="1_splash"]
 [ext_resource type="Texture2D" path="res://gfx/splashscreen.png" id="2_splashimg"]
+[ext_resource type="Texture2D" path="res://gfx/splashscreen_2.png" id="3_splashimg_land"]
 
 [node name="Splash" type="Control"]
 layout_mode = 3
@@ -11,6 +12,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_splash")
+landscape_texture = ExtResource("3_splashimg_land")
+portrait_texture = ExtResource("2_splashimg")
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -29,5 +32,5 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("2_splashimg")
-stretch_mode = 5
+stretch_mode = 0
 expand_mode = 0
