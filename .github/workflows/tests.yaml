@@ -14,10 +14,10 @@ jobs:
 
       - name: Install Godot
         run: |
-          wget https://downloads.tuxfamily.org/godotengine/4.3/Godot_v4.3-stable_linux.x86_64.zip
-          unzip Godot_v4.3-stable_linux.x86_64.zip
+          wget https://github.com/godotengine/godot/releases/download/4.6-stable/Godot_v4.6-stable_linux.x86_64.zip
+          unzip Godot_v4.6-stable_linux.x86_64.zip
 
       - name: Run Tests
         run: |
-          ./Godot_v4.3-stable_linux.x86_64 --headless \
+          ./Godot_v4.6-stable_linux.x86_64 --headless \
           -s addons/gdUnit4/bin/GdUnitCmdTool.gd -a run
