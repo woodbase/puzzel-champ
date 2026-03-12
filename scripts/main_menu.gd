@@ -550,6 +550,12 @@ func _build_settings_panel() -> Control:
 	lb_btn.pressed.connect(_show_leaderboard)
 	vbox.add_child(lb_btn)
 
+	# ── Settings button ──
+	var settings_btn := _make_button("⚙ Settings")
+	settings_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_btn.pressed.connect(_show_settings_overlay)
+	vbox.add_child(settings_btn)
+
 	# ── Start button ──
 	_start_btn = _make_button("Start Puzzle")
 	_start_btn.custom_minimum_size = Vector2(0, 54)
@@ -923,6 +929,7 @@ func _on_resume_pressed() -> void:
 	GameState.cols                   = int(save_data.get("cols", GameState.cols))
 	GameState.rows                   = int(save_data.get("rows", GameState.rows))
 	GameState.piece_shape            = str(save_data.get("piece_shape", GameState.piece_shape))
+	GameState.allow_rotation         = bool(save_data.get("allow_rotation", false))
 	GameState.difficulty_explicitly_set = true
 	GameState.resume_save            = true
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
@@ -1073,6 +1080,144 @@ func _show_leaderboard() -> void:
 		empty_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		scores_vbox.add_child(empty_lbl)
+
+
+# ─── Settings overlay ─────────────────────────────────────────────────────────
+
+## Builds and shows a fullscreen Settings overlay containing:
+##   • Difficulty Options  – rotate pieces toggle
+##   • Controls            – reference guide for mouse/touch interactions
+func _show_settings_overlay() -> void:
+	var overlay := Control.new()
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.z_index = 10
+	add_child(overlay)
+
+	# Dimmed backdrop – clicking it closes the overlay.
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.72)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(dim)
+	dim.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton:
+			var mb := event as InputEventMouseButton
+			if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+				overlay.queue_free()
+	)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(center)
+
+	var card := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.12, 0.10, 0.22, 0.98)
+	_set_corner_radius(ps, 16)
+	ps.border_width_left   = 2
+	ps.border_width_right  = 2
+	ps.border_width_top    = 2
+	ps.border_width_bottom = 2
+	ps.border_color = Color(0.55, 0.35, 0.90)
+	card.add_theme_stylebox_override("panel", ps)
+	card.custom_minimum_size = Vector2(UIScale.px(460), UIScale.px(360))
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(card)
+
+	var outer := MarginContainer.new()
+	outer.add_theme_constant_override("margin_left",   UIScale.px(32))
+	outer.add_theme_constant_override("margin_right",  UIScale.px(32))
+	outer.add_theme_constant_override("margin_top",    UIScale.px(24))
+	outer.add_theme_constant_override("margin_bottom", UIScale.px(24))
+	card.add_child(outer)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	outer.add_child(vbox)
+
+	# Title row.
+	var title_row := HBoxContainer.new()
+	vbox.add_child(title_row)
+
+	var title_lbl := Label.new()
+	title_lbl.text = "⚙  Settings"
+	title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(28))
+	title_lbl.add_theme_color_override("font_color", TEXT_COLOR)
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title_lbl)
+
+	var close_btn := _make_button("✕ Close")
+	close_btn.pressed.connect(func() -> void:
+		if is_instance_valid(overlay):
+			overlay.queue_free()
+	)
+	title_row.add_child(close_btn)
+
+	var sep0 := HSeparator.new()
+	sep0.add_theme_color_override("color", Color(0.35, 0.28, 0.55))
+	vbox.add_child(sep0)
+
+	# ── Difficulty Options ──────────────────────────────────────────────────────
+	var diff_opts_hdr := Label.new()
+	diff_opts_hdr.text = "Difficulty Options"
+	diff_opts_hdr.add_theme_font_size_override("font_size", UIScale.font_size(18))
+	diff_opts_hdr.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
+	vbox.add_child(diff_opts_hdr)
+
+	var rot_cb := CheckBox.new()
+	rot_cb.text = "Rotate pieces (pieces spawn at random 90° angles – right-click to rotate)"
+	rot_cb.button_pressed = GameState.allow_rotation
+	rot_cb.add_theme_color_override("font_color", TEXT_COLOR)
+	rot_cb.add_theme_font_size_override("font_size", UIScale.font_size(14))
+	rot_cb.toggled.connect(func(on: bool) -> void: GameState.allow_rotation = on)
+	vbox.add_child(rot_cb)
+
+	var sep1 := HSeparator.new()
+	sep1.add_theme_color_override("color", Color(0.35, 0.28, 0.55))
+	vbox.add_child(sep1)
+
+	# ── Controls ───────────────────────────────────────────────────────────────
+	var controls_hdr := Label.new()
+	controls_hdr.text = "Controls"
+	controls_hdr.add_theme_font_size_override("font_size", UIScale.font_size(18))
+	controls_hdr.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
+	vbox.add_child(controls_hdr)
+
+	var controls: Array[Dictionary] = [
+		{"icon": "🖱 Left click",             "desc": "Select a piece"},
+		{"icon": "🖱 Hold + drag",            "desc": "Move a piece"},
+		{"icon": "🖱 Right click",            "desc": "Rotate piece 90° clockwise (rotation difficulty only)"},
+		{"icon": "🖱 Scroll wheel",           "desc": "Zoom in / out"},
+		{"icon": "🖱 Middle-click drag",      "desc": "Pan the workspace"},
+		{"icon": "👆 Tap & drag",             "desc": "Move a piece (touch)"},
+		{"icon": "👐 Pinch",                  "desc": "Zoom in / out (touch)"},
+		{"icon": "✌ Two-finger swipe",       "desc": "Pan the workspace (touch)"},
+	]
+
+	var controls_vbox := VBoxContainer.new()
+	controls_vbox.add_theme_constant_override("separation", 6)
+	vbox.add_child(controls_vbox)
+
+	for ctrl: Dictionary in controls:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		controls_vbox.add_child(row)
+
+		var icon_lbl := Label.new()
+		icon_lbl.text = ctrl["icon"]
+		icon_lbl.custom_minimum_size = Vector2(UIScale.px(180), 0)
+		icon_lbl.add_theme_font_size_override("font_size", UIScale.font_size(13))
+		icon_lbl.add_theme_color_override("font_color", Color(0.85, 0.78, 1.0))
+		row.add_child(icon_lbl)
+
+		var desc_lbl := Label.new()
+		desc_lbl.text = ctrl["desc"]
+		desc_lbl.add_theme_font_size_override("font_size", UIScale.font_size(13))
+		desc_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
+		desc_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		desc_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(desc_lbl)
 
 
 # ─── Responsive layout ────────────────────────────────────────────────────────

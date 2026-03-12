@@ -63,6 +63,12 @@ var volume: float = 1.0
 ## auto-select a screen-size-appropriate difficulty on first load.
 var difficulty_explicitly_set: bool = false
 
+## When true, puzzle pieces are spawned at random 90° rotations (0°, 90°, 180°,
+## or 270°) as an additional difficulty modifier. Players right-click a piece to
+## rotate it 90° clockwise; a piece can only snap into place when it is in the
+## correct orientation (0°).
+var allow_rotation: bool = false
+
 # ─── Leaderboard ─────────────────────────────────────────────────────────────
 
 ## File path where leaderboard scores are persisted between sessions.

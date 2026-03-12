@@ -520,8 +520,8 @@ func _on_layout_changed() -> void:
 ## overflows the screen (important on small landscape phone screens).
 func _settings_panel_height() -> int:
 	var vp_h := int(get_viewport().get_visible_rect().size.y)
-	# 390 px is the natural content height; cap to fit on small screens.
-	return mini(390, vp_h - int(HUD_H) - 8)
+	# 460 px is the natural content height; cap to fit on small screens.
+	return mini(460, vp_h - int(HUD_H) - 8)
 
 
 # ─── Workspace zoom and pan ───────────────────────────────────────────────────
@@ -727,6 +727,25 @@ func _build_settings_panel() -> void:
 		"Vibration",
 		GameState.feedback_haptic,
 		func(on: bool) -> void: GameState.feedback_haptic = on
+	))
+
+	# ── Difficulty Options ──
+	var diff_opts_sep := HSeparator.new()
+	diff_opts_sep.add_theme_color_override("color", Color(0.35, 0.28, 0.50))
+	vbox.add_child(diff_opts_sep)
+
+	var diff_opts_lbl := Label.new()
+	diff_opts_lbl.text = "Difficulty Options"
+	diff_opts_lbl.add_theme_font_size_override("font_size", 13)
+	diff_opts_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	vbox.add_child(diff_opts_lbl)
+
+	vbox.add_child(_make_feedback_toggle(
+		"Rotate pieces",
+		GameState.allow_rotation,
+		func(on: bool) -> void:
+			GameState.allow_rotation = on
+			_on_new_puzzle()
 	))
 
 	_settings_panel = panel
@@ -1318,6 +1337,12 @@ func _build_puzzle() -> void:
 		# aspect ratio.  35 % is tight enough to prevent accidental snaps to
 		# adjacent slots while remaining easy to hit intentionally.
 		piece.snap_distance = minf(screen_piece_w, screen_piece_h) * 0.35
+
+		# Apply a random 90° rotation when rotation difficulty is enabled.
+		if GameState.allow_rotation:
+			var steps: int = randi() % 4
+			piece.rotation_steps = steps
+			piece.rotation_degrees = steps * 90.0
 
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
@@ -1925,7 +1950,8 @@ func _save_puzzle_state() -> void:
 		pieces_data.append({
 			"pos_x": piece.position.x,
 			"pos_y": piece.position.y,
-			"is_locked": piece.is_locked
+			"is_locked": piece.is_locked,
+			"rotation_steps": piece.rotation_steps
 		})
 
 	var save_data: Dictionary = {
@@ -1935,6 +1961,7 @@ func _save_puzzle_state() -> void:
 		"cols": cols,
 		"rows": rows,
 		"piece_shape": _piece_shape,
+		"allow_rotation": GameState.allow_rotation,
 		"elapsed_time": _timer_elapsed,
 		"pieces": pieces_data
 	}
@@ -1984,7 +2011,7 @@ func _apply_saved_state() -> void:
 	_timer_last_s  = -1
 	_update_timer_label()
 
-	# Restore each piece's position and locked state.
+	# Restore each piece's position, locked state, and rotation.
 	_placed_pieces = 0
 	for i in range(_pieces.size()):
 		var piece = _pieces[i]
@@ -1992,6 +2019,9 @@ func _apply_saved_state() -> void:
 			continue
 		var pd: Dictionary = pieces_data[i]
 		piece.position = Vector2(float(pd.get("pos_x", 0.0)), float(pd.get("pos_y", 0.0)))
+		var steps: int = int(pd.get("rotation_steps", 0))
+		piece.rotation_steps = steps
+		piece.rotation_degrees = steps * 90.0
 		var locked: bool = bool(pd.get("is_locked", false))
 		if locked:
 			piece.is_locked       = true
@@ -2089,6 +2119,14 @@ func _on_restart_puzzle() -> void:
 		piece.input_pickable = true
 		piece.visible = true
 		piece.z_index = 0
+		# Re-apply a fresh random rotation when rotation difficulty is enabled.
+		if GameState.allow_rotation:
+			var steps: int = randi() % 4
+			piece.rotation_steps = steps
+			piece.rotation_degrees = steps * 90.0
+		else:
+			piece.rotation_steps = 0
+			piece.rotation_degrees = 0.0
 		if i < _pieces_initial_positions.size():
 			piece.position = _pieces_initial_positions[i]
 		else:
