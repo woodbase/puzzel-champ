@@ -3,9 +3,11 @@ class_name GdUnitAssertions
 extends RefCounted
 
 
+@warning_ignore("return_value_discarded")
 func _init() -> void:
 	# preload all gdunit assertions to speedup testsuite loading time
 	# gdlint:disable=private-method-call
+	@warning_ignore_start("return_value_discarded")
 	GdUnitAssertions.__lazy_load("res://addons/gdUnit4/src/asserts/GdUnitAssertImpl.gd")
 	GdUnitAssertions.__lazy_load("res://addons/gdUnit4/src/asserts/GdUnitBoolAssertImpl.gd")
 	GdUnitAssertions.__lazy_load("res://addons/gdUnit4/src/asserts/GdUnitStringAssertImpl.gd")
@@ -21,6 +23,7 @@ func _init() -> void:
 	GdUnitAssertions.__lazy_load("res://addons/gdUnit4/src/asserts/GdUnitSignalAssertImpl.gd")
 	GdUnitAssertions.__lazy_load("res://addons/gdUnit4/src/asserts/GdUnitFailureAssertImpl.gd")
 	GdUnitAssertions.__lazy_load("res://addons/gdUnit4/src/asserts/GdUnitGodotErrorAssertImpl.gd")
+	@warning_ignore_restore("return_value_discarded")
 
 
 ### We now load all used asserts and tool scripts into the cache according to the principle of "lazy loading"
@@ -32,8 +35,9 @@ static func __lazy_load(script_path :String) -> GDScript:
 	return ResourceLoader.load(script_path, "GDScript", ResourceLoader.CACHE_MODE_REUSE)
 
 
-static func validate_value_type(value, type :Variant.Type) -> bool:
+static func validate_value_type(value :Variant, type :Variant.Type) -> bool:
 	return value == null or typeof(value) == type
+
 
 # Scans the current stack trace for the root cause to extract the line number
 static func get_line_number() -> int:
@@ -57,6 +61,7 @@ static func get_line_number() -> int:
 			or source.ends_with("GdUnitTestSuite.gd") \
 			or source.ends_with("GdUnitSceneRunnerImpl.gd") \
 			or source.ends_with("GdUnitObjectInteractions.gd") \
+			or source.ends_with("GdUnitObjectInteractionsVerifier.gd") \
 			or source.ends_with("GdUnitAwaiter.gd"):
 			continue
 		return stack_info.get("line")

@@ -1,113 +1,104 @@
 @tool
-extends HBoxContainer
-
-signal run_overall_pressed(debug :bool)
-signal run_pressed(debug :bool)
-signal stop_pressed()
-
-@onready var debug_icon_image :Texture2D = load("res://addons/gdUnit4/src/ui/assets/PlayDebug.svg")
-@onready var overall_icon_image :Texture2D = load("res://addons/gdUnit4/src/ui/assets/PlayOverall.svg")
-@onready var _version_label := %version
-@onready var _button_wiki := %help
-@onready var _tool_button := %tool
-@onready var _button_run_overall :Button = %"run-overall"
-@onready var _button_run := %run
-@onready var _button_run_debug := %debug
-@onready var _button_stop := %stop
+extends PanelContainer
 
 
-const SETTINGS_SHORTCUT_MAPPING := {
-	GdUnitSettings.SHORTCUT_INSPECTOR_RERUN_TEST : GdUnitShortcut.ShortCut.RERUN_TESTS,
-	GdUnitSettings.SHORTCUT_INSPECTOR_RERUN_TEST_DEBUG : GdUnitShortcut.ShortCut.RERUN_TESTS_DEBUG,
-	GdUnitSettings.SHORTCUT_INSPECTOR_RUN_TEST_OVERALL : GdUnitShortcut.ShortCut.RUN_TESTS_OVERALL,
-	GdUnitSettings.SHORTCUT_INSPECTOR_RUN_TEST_STOP : GdUnitShortcut.ShortCut.STOP_TEST_RUN,
-}
+const  InspectorTreeMainPanel := preload("res://addons/gdUnit4/src/ui/parts/InspectorTreeMainPanel.gd")
+
+@onready var _version_label: Control = %version
+@onready var _button_wiki: Button = %help
+@onready var _tool_button: Button = %tool
+@onready var _button_run_overall: Button = %run_overall
+@onready var _button_run: Button = %run
+@onready var _button_run_debug: Button = %debug
+@onready var _button_stop: Button = %stop
 
 
-func _ready():
+var inspector: InspectorTreeMainPanel
+var command_handler: GdUnitCommandHandler
+
+
+func _ready() -> void:
+	command_handler = GdUnitCommandHandler.instance()
+	inspector = get_parent().get_parent().find_child("MainPanel", false, false)
+	if inspector == null:
+		push_error("Internal error, can't connect to the test inspector!")
+	else:
+		inspector.tree_item_selected.connect(_on_inspector_selected)
+
 	GdUnit4Version.init_version_label(_version_label)
-	var command_handler := GdUnitCommandHandler.instance()
-	run_pressed.connect(command_handler._on_run_pressed)
-	run_overall_pressed.connect(command_handler._on_run_overall_pressed)
-	stop_pressed.connect(command_handler._on_stop_pressed)
-	command_handler.gdunit_runner_start.connect(_on_gdunit_runner_start)
-	command_handler.gdunit_runner_stop.connect(_on_gdunit_runner_stop)
-	GdUnitSignals.instance().gdunit_settings_changed.connect(_on_gdunit_settings_changed)
-	init_buttons()
-	init_shortcuts(command_handler)
+
+	GdUnitSignals.instance().gdunit_event.connect(_on_gdunit_event)
+	GdUnitSignals.instance().gdunit_settings_changed.connect(_on_settings_changed)
+	_init_buttons()
 
 
-func init_buttons() -> void:
-	var editor :EditorPlugin = EditorPlugin.new()
-	var editior_control := editor.get_editor_interface().get_base_control()
-	_button_run_overall.icon = overall_icon_image
-	_button_run_overall.visible = GdUnitSettings.is_inspector_toolbar_button_show()
-	_button_run.icon = GodotVersionFixures.get_icon(editior_control, "Play")
-	_button_run_debug.icon = debug_icon_image
-	_button_stop.icon = GodotVersionFixures.get_icon(editior_control, "Stop")
-	_tool_button.icon = GodotVersionFixures.get_icon(editior_control, "Tools")
-	_button_wiki.icon = GodotVersionFixures.get_icon(editior_control, "HelpSearch")
+func _init_buttons() -> void:
+	_init_button(_button_run_overall, GdUnitCommandRunTestsOverall.ID)
+	_init_button(_button_run, GdUnitCommandInspectorRunTests.ID)
+	_init_button(_button_run_debug, GdUnitCommandInspectorDebugTests.ID)
+	_init_button(_button_stop, GdUnitCommandStopTestSession.ID)
 
-
-func init_shortcuts(command_handler :GdUnitCommandHandler) -> void:
-	_button_run.shortcut = command_handler.get_shortcut(GdUnitShortcut.ShortCut.RERUN_TESTS)
-	_button_run_overall.shortcut = command_handler.get_shortcut(GdUnitShortcut.ShortCut.RUN_TESTS_OVERALL)
-	_button_run_debug.shortcut = command_handler.get_shortcut(GdUnitShortcut.ShortCut.RERUN_TESTS_DEBUG)
-	_button_stop.shortcut = command_handler.get_shortcut(GdUnitShortcut.ShortCut.STOP_TEST_RUN)
-	# register for shortcut changes
-	GdUnitSignals.instance().gdunit_settings_changed.connect(_on_settings_changed.bind(command_handler))
-
-
-func _on_runoverall_pressed(debug := false):
-	run_overall_pressed.emit(debug)
-
-
-func _on_run_pressed(debug := false):
-	run_pressed.emit(debug)
-
-
-func _on_stop_pressed():
-	stop_pressed.emit()
-
-
-func _on_gdunit_runner_start():
-	_button_run_overall.disabled = true
+	_button_stop.icon = command_handler.command_icon(GdUnitCommandStopTestSession.ID)
+	_tool_button.icon = GdUnitUiTools.get_icon("Tools")
+	_button_wiki.icon = GdUnitUiTools.get_icon("HelpSearch")
+	# Set run buttons initial disabled
 	_button_run.disabled = true
 	_button_run_debug.disabled = true
-	_button_stop.disabled = false
 
 
-func _on_gdunit_runner_stop(_client_id :int):
-	_button_run_overall.disabled = false
-	_button_run.disabled = false
-	_button_run_debug.disabled = false
-	_button_stop.disabled = true
+func _init_button(button: Button, comand_id: String) -> void:
+	button.set_meta("GdUnitCommand", comand_id)
+	button.icon = command_handler.command_icon(comand_id)
+	button.shortcut = command_handler.command_shortcut(comand_id)
+	if button == _button_run_overall:
+		button.visible = GdUnitSettings.is_inspector_toolbar_button_show()
 
 
-func _on_gdunit_settings_changed(_property :GdUnitProperty):
-	_button_run_overall.visible = GdUnitSettings.is_inspector_toolbar_button_show()
+func _on_inspector_selected(item: TreeItem) -> void:
+	var button_disabled := item == null
+	_button_run.disabled = button_disabled
+	_button_run_debug.disabled = button_disabled
 
 
-func _on_wiki_pressed():
-	OS.shell_open("https://mikeschulze.github.io/gdUnit4/")
+func _on_gdunit_event(event: GdUnitEvent) -> void:
+	if event.type() == GdUnitEvent.SESSION_START:
+		_button_run_overall.disabled = true
+		_button_run.disabled = true
+		_button_run_debug.disabled = true
+		_button_stop.disabled = false
+		return
+	if event.type() == GdUnitEvent.SESSION_CLOSE:
+		_button_run_overall.disabled = false
+		_button_stop.disabled = true
 
 
-func _on_btn_tool_pressed():
-	var tool_popup = load("res://addons/gdUnit4/src/ui/settings/GdUnitSettingsDialog.tscn").instantiate()
-	get_parent_control().add_child(tool_popup)
+func _on_button_pressed(source: BaseButton) -> void:
+	var command_id: String = source.get_meta("GdUnitCommand")
+	await command_handler.command_execute(command_id)
 
 
-func _on_settings_changed(property :GdUnitProperty, command_handler :GdUnitCommandHandler):
+func _on_wiki_pressed() -> void:
+	var status := OS.shell_open("https://godot-gdunit-labs.github.io/gdUnit4/latest")
+	if status != OK:
+		push_error("Can't open GdUnit4 documentaion page: %s" % error_string(status))
+
+
+func _on_btn_tool_pressed() -> void:
+	var settings_dlg: Window = EditorInterface.get_base_control().find_child("GdUnitSettingsDialog", false, false)
+	if settings_dlg == null:
+		settings_dlg = preload("res://addons/gdUnit4/src/ui/settings/GdUnitSettingsDialog.tscn").instantiate()
+		EditorInterface.get_base_control().add_child(settings_dlg, true)
+	settings_dlg.popup_centered_ratio(.60)
+
+
+func _on_settings_changed(property: GdUnitProperty) -> void:
 	# needs to wait a frame to be command handler notified first for settings changes
 	await get_tree().process_frame
-	if SETTINGS_SHORTCUT_MAPPING.has(property.name()):
-		var shortcut :GdUnitShortcut.ShortCut = SETTINGS_SHORTCUT_MAPPING.get(property.name(), GdUnitShortcut.ShortCut.NONE)
-		match shortcut:
-			GdUnitShortcut.ShortCut.RERUN_TESTS:
-				_button_run.shortcut = command_handler.get_shortcut(shortcut)
-			GdUnitShortcut.ShortCut.RUN_TESTS_OVERALL:
-				_button_run_overall.shortcut = command_handler.get_shortcut(shortcut)
-			GdUnitShortcut.ShortCut.RERUN_TESTS_DEBUG:
-				_button_run_debug.shortcut = command_handler.get_shortcut(shortcut)
-			GdUnitShortcut.ShortCut.STOP_TEST_RUN:
-				_button_stop.shortcut = command_handler.get_shortcut(shortcut)
+
+	_button_run_overall.visible = GdUnitSettings.is_inspector_toolbar_button_show()
+
+	if property.name().begins_with(GdUnitSettings.GROUP_SHORTCUT_INSPECTOR):
+		_button_run.shortcut = command_handler.command_shortcut(GdUnitCommandInspectorRunTests.ID)
+		_button_run_debug.shortcut = command_handler.command_shortcut(GdUnitCommandInspectorDebugTests.ID)
+		_button_run_overall.shortcut = command_handler.command_shortcut(GdUnitCommandRunTestsOverall.ID)
+		_button_stop.shortcut = command_handler.command_shortcut(GdUnitCommandStopTestSession.ID)
