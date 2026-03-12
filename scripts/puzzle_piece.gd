@@ -38,6 +38,11 @@ const PARTICLE_CLEANUP_DELAY: float = 0.2
 ## Golden colour used for the lock-particle burst.
 const PARTICLE_COLOR: Color = Color(1.0, 0.9, 0.3)
 
+## Current rotation step (0–3) when piece rotation is enabled.
+## 0 = 0°, 1 = 90°, 2 = 180°, 3 = 270°. A piece can only snap when
+## rotation_steps == 0 (correct orientation).
+var rotation_steps: int = 0
+
 
 func _ready() -> void:
 	input_pickable = true
@@ -53,6 +58,10 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 			_start_drag(get_global_mouse_position())
 			# Consume the event so overlapping pieces don't also start dragging,
 			# which could cause the wrong piece to snap into an incorrect position.
+			get_viewport().set_input_as_handled()
+		elif mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed \
+				and GameState.allow_rotation:
+			_rotate_clockwise()
 			get_viewport().set_input_as_handled()
 	elif event is InputEventScreenTouch:
 		# Explicit touch handling for mobile devices.  Even when
@@ -116,8 +125,17 @@ func _update_drag(mouse_pos: Vector2) -> void:
 	global_position = mouse_pos + _drag_offset
 
 
+## Rotates the piece 90° clockwise and increments the rotation_steps counter.
+## Only called when GameState.allow_rotation is enabled.
+func _rotate_clockwise() -> void:
+	rotation_steps = (rotation_steps + 1) % 4
+	rotation_degrees = rotation_steps * 90.0
+
+
 ## Ends dragging; snaps and locks the piece if close enough to its target.
 ## Enhanced with scale-down animation when releasing.
+## When allow_rotation is enabled the piece must also be in the correct
+## orientation (rotation_steps == 0) before it can snap into place.
 func _end_drag() -> void:
 	if not _dragging:
 		return  # Guard: ignore if not dragging (e.g. both ScreenTouch + emulated MouseButton fire).
@@ -132,6 +150,10 @@ func _end_drag() -> void:
 
 	var correct_global: Vector2 = parent_2d.to_global(correct_position)
 	var distance := global_position.distance_to(correct_global)
+	var rotation_correct: bool = (rotation_steps == 0) or not GameState.allow_rotation
+	if distance < snap_distance and rotation_correct:
+		global_position = correct_global
+		rotation_degrees = 0.0
 	if distance < snap_distance:
 		if GameState.snap_to_board:
 			global_position = correct_global
