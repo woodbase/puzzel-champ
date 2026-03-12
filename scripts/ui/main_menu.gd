@@ -412,10 +412,9 @@ func _load_saved_puzzle_data() -> bool:
 	var json := JSON.new()
 	if json.parse(text) != OK:
 		return false
-	var data := json.get_data()
-	if not (data is Dictionary):
+	var payload := json.get_data() as Dictionary
+	if payload == null:
 		return false
-	var payload := data as Dictionary
 
 	var path := payload.get("image_path", "") as String
 	var tex: Texture2D = null
