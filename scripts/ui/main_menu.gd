@@ -237,7 +237,7 @@ func _apply_responsive_layout() -> void:
 	_scene_grid.columns = 2 if UIScale.is_mobile() else 3
 	if _content != null:
 		var available := get_viewport_rect().size.x - 56.0
-		var target_w := min(1100.0, max(720.0, available))
+		var target_w: float = min(1100.0, max(720.0, available))
 		_content.custom_minimum_size = Vector2(target_w, _content.custom_minimum_size.y)
 
 
