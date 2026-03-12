@@ -154,6 +154,9 @@ func _end_drag() -> void:
 	if distance < snap_distance and rotation_correct:
 		global_position = correct_global
 		rotation_degrees = 0.0
+	if distance < snap_distance:
+		if GameState.snap_to_board:
+			global_position = correct_global
 		is_locked = true
 		input_pickable = false
 		if GameState.feedback_haptic:

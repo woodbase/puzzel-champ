@@ -307,7 +307,7 @@ func _process(delta: float) -> void:
 		if current_s != _timer_last_s:
 			_timer_last_s = current_s
 			_update_timer_label()
-	if _dragged_piece != null and GameState.feedback_visual:
+	if _dragged_piece != null and GameState.feedback_visual and GameState.snap_to_board:
 		var current_pos: Vector2 = _dragged_piece.global_position
 		if current_pos != _last_drag_pos:
 			_last_drag_pos = current_pos
@@ -317,7 +317,7 @@ func _process(delta: float) -> void:
 ## Draws a highlight rectangle at the target position of the dragged piece when
 ## it is within HIGHLIGHT_DISTANCE of that target.
 func _draw() -> void:
-	if _dragged_piece == null or not GameState.feedback_visual or _piece_size == Vector2.ZERO:
+	if _dragged_piece == null or not GameState.feedback_visual or not GameState.snap_to_board or _piece_size == Vector2.ZERO:
 		return
 	var target_local: Vector2 = _dragged_piece.correct_position
 	var target_global: Vector2 = to_global(target_local)
@@ -717,6 +717,11 @@ func _build_settings_panel() -> void:
 		"Visual effects",
 		GameState.feedback_visual,
 		func(on: bool) -> void: GameState.feedback_visual = on
+	))
+	vbox.add_child(_make_feedback_toggle(
+		"Snap to board",
+		GameState.snap_to_board,
+		func(on: bool) -> void: GameState.snap_to_board = on
 	))
 	vbox.add_child(_make_feedback_toggle(
 		"Sound effects",
