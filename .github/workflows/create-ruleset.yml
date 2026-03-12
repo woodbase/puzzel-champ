@@ -10,7 +10,7 @@ jobs:
       - name: Create or update branch ruleset
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.ruleset }}
           script: |
             const rulesetName = 'main branch protection';
 
