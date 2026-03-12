@@ -75,6 +75,17 @@ var _start_btn: Button           = null
 var _resume_btn: Button          = null
 var _file_dialog: FileDialog     = null
 var _gallery_grid: GridContainer = null  # kept for dynamic item insertion
+
+## True when the player is using a custom piece count instead of a preset.
+var _use_custom: bool = false
+## The last custom piece count entered by the player (used when _use_custom is true).
+var _custom_piece_count: int = 100
+## The custom difficulty button (desktop only).
+var _custom_btn: Button = null
+## Container for the custom piece-count SpinBox row (desktop only).
+var _custom_container: Control = null
+## SpinBox for entering a custom piece count (desktop only).
+var _custom_spin: SpinBox = null
 ## Top-level layout container (HBoxContainer in landscape, VBoxContainer in portrait).
 var _content_row: Control        = null
 var _gallery_panel: Control      = null
@@ -106,7 +117,12 @@ func _ready() -> void:
 	# On first load (no game started yet) auto-select a sensible default
 	# based on screen size; otherwise restore the player's last choice.
 	if GameState.difficulty_explicitly_set:
-		_apply_difficulty(_find_difficulty_index(GameState.cols, GameState.rows))
+		if not UIScale.is_mobile() and not _is_preset_difficulty(GameState.cols, GameState.rows):
+			# Restore a previously saved custom piece count.
+			_custom_piece_count = GameState.cols * GameState.rows
+			_apply_custom()
+		else:
+			_apply_difficulty(_find_difficulty_index(GameState.cols, GameState.rows))
 	else:
 		_apply_difficulty(_default_difficulty_for_screen())
 
@@ -501,6 +517,13 @@ func _build_settings_panel() -> Control:
 		diff_row.add_child(btn)
 		_diff_btns.append(btn)
 
+	# "Custom" button – desktop only, lets the player type an exact piece count.
+	if not UIScale.is_mobile():
+		_custom_btn = _make_button("Custom")
+		_custom_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_custom_btn.pressed.connect(_apply_custom)
+		diff_row.add_child(_custom_btn)
+
 	_piece_count_lbl = Label.new()
 	_piece_count_lbl.add_theme_font_size_override("font_size", 14)
 	_piece_count_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
@@ -511,6 +534,29 @@ func _build_settings_panel() -> Control:
 	_difficulty_desc_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR.lightened(0.15))
 	_difficulty_desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_difficulty_desc_lbl)
+
+	# Custom piece-count input (desktop only).
+	if not UIScale.is_mobile():
+		_custom_container = HBoxContainer.new()
+		_custom_container.add_theme_constant_override("separation", 8)
+		_custom_container.visible = false
+		vbox.add_child(_custom_container)
+
+		var spin_lbl := Label.new()
+		spin_lbl.text = "Number of pieces:"
+		spin_lbl.add_theme_font_size_override("font_size", 14)
+		spin_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
+		spin_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_custom_container.add_child(spin_lbl)
+
+		_custom_spin = SpinBox.new()
+		_custom_spin.min_value = 2
+		_custom_spin.max_value = 1000
+		_custom_spin.step = 1
+		_custom_spin.value = _custom_piece_count
+		_custom_spin.custom_minimum_size = Vector2(120, 0)
+		_custom_spin.value_changed.connect(_on_custom_spin_changed)
+		_custom_container.add_child(_custom_spin)
 
 	# ── Piece Shape ──
 	var shape_hdr := Label.new()
@@ -688,6 +734,20 @@ func _apply_selection(texture: Texture2D, path: String, gallery_idx: int) -> voi
 
 func _apply_difficulty(index: int) -> void:
 	_difficulty_index = index
+	_use_custom = false
+
+	# Deactivate the custom button and hide the spinbox.
+	if _custom_btn != null:
+		var sb_c := StyleBoxFlat.new()
+		_set_corner_radius(sb_c, 8)
+		sb_c.bg_color = BTN_COLOR
+		sb_c.content_margin_left   = 14
+		sb_c.content_margin_right  = 14
+		sb_c.content_margin_top    = 10
+		sb_c.content_margin_bottom = 10
+		_custom_btn.add_theme_stylebox_override("normal", sb_c)
+	if _custom_container != null:
+		_custom_container.visible = false
 
 	# Refresh button highlight.
 	for i in range(_diff_btns.size()):
@@ -734,6 +794,89 @@ func _find_difficulty_index(c: int, r: int) -> int:
 ## desktops and tablets get Medium for a balanced starting experience.
 func _default_difficulty_for_screen() -> int:
 	return 0 if UIScale.is_mobile() else 1  # Easy for mobile, Medium for desktop
+
+
+## Returns true if the given cols/rows pair matches one of the preset difficulty levels.
+func _is_preset_difficulty(c: int, r: int) -> bool:
+	for d: Dictionary in DIFFICULTIES:
+		if d["cols"] == c and d["rows"] == r:
+			return true
+	return false
+
+
+## Computes the best-fit (cols, rows) pair for the requested piece count, targeting
+## a 4:3 (landscape) aspect ratio.  Both dimensions are at least 1.
+## The resulting cols*rows may differ slightly from n due to integer rounding.
+func _cols_rows_from_piece_count(n: int) -> Vector2i:
+	var cols := maxi(1, roundi(sqrt(float(n) * 4.0 / 3.0)))
+	var rows := maxi(1, roundi(float(n) / float(cols)))
+	return Vector2i(cols, rows)
+
+
+## Activates custom piece-count mode: highlights the Custom button, shows the
+## SpinBox, and refreshes the piece-count label.
+func _apply_custom() -> void:
+	_use_custom = true
+
+	# Deactivate all preset difficulty buttons.
+	for btn: Button in _diff_btns:
+		var sb := StyleBoxFlat.new()
+		_set_corner_radius(sb, 8)
+		sb.bg_color = BTN_COLOR
+		sb.content_margin_left   = 14
+		sb.content_margin_right  = 14
+		sb.content_margin_top    = 10
+		sb.content_margin_bottom = 10
+		btn.add_theme_stylebox_override("normal", sb)
+
+	# Highlight the Custom button.
+	if _custom_btn != null:
+		var sb := StyleBoxFlat.new()
+		_set_corner_radius(sb, 8)
+		sb.bg_color = ACCENT_COLOR
+		sb.border_width_left   = 2
+		sb.border_width_right  = 2
+		sb.border_width_top    = 2
+		sb.border_width_bottom = 2
+		sb.border_color = Color(0.85, 0.75, 1.0)
+		sb.content_margin_left   = 14
+		sb.content_margin_right  = 14
+		sb.content_margin_top    = 10
+		sb.content_margin_bottom = 10
+		_custom_btn.add_theme_stylebox_override("normal", sb)
+
+	# Show the SpinBox and sync its value.
+	if _custom_container != null:
+		_custom_container.visible = true
+	if _custom_spin != null:
+		_custom_spin.set_value_no_signal(float(_custom_piece_count))
+
+	# Refresh labels.
+	_refresh_custom_labels()
+
+
+## Updates the piece-count and description labels to reflect the current custom
+## piece count, computing an approximate grid size.
+func _refresh_custom_labels() -> void:
+	var cr := _cols_rows_from_piece_count(_custom_piece_count)
+	var actual := cr.x * cr.y
+	if _piece_count_lbl != null:
+		if actual == _custom_piece_count:
+			_piece_count_lbl.text = "%d pieces (%d \u00d7 %d grid)" % [
+				actual, cr.x, cr.y
+			]
+		else:
+			_piece_count_lbl.text = "%d requested \u2192 %d pieces (%d \u00d7 %d grid)" % [
+				_custom_piece_count, actual, cr.x, cr.y
+			]
+	if _difficulty_desc_lbl != null:
+		_difficulty_desc_lbl.text = "Custom piece count"
+
+
+## Called when the custom SpinBox value changes.
+func _on_custom_spin_changed(value: float) -> void:
+	_custom_piece_count = maxi(2, int(value))
+	_refresh_custom_labels()
 
 
 func _apply_shape(index: int) -> void:
@@ -871,14 +1014,19 @@ func _on_start_pressed() -> void:
 	if _selected_texture == null:
 		_show_error("Please select an image first.")
 		return
-	var d := DIFFICULTIES[_difficulty_index]
 	GameState.difficulty_explicitly_set = true
 	GameState.image_texture = _selected_texture
 	GameState.image_path    = _selected_path
 	GameState.gallery_index = _active_gallery_idx
-	GameState.cols          = d["cols"]
-	GameState.rows          = d["rows"]
 	GameState.piece_shape   = SHAPES[_shape_index]["key"]
+	if _use_custom:
+		var cr := _cols_rows_from_piece_count(_custom_piece_count)
+		GameState.cols = cr.x
+		GameState.rows = cr.y
+	else:
+		var d := DIFFICULTIES[_difficulty_index]
+		GameState.cols = d["cols"]
+		GameState.rows = d["rows"]
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
 
 

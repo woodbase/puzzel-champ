@@ -78,6 +78,7 @@ While the system provides smart defaults, players always have full control:
 - All four difficulty levels are accessible from the main menu
 - Selected difficulty persists across sessions (via `GameState.difficulty_explicitly_set`)
 - No unlocking or progression barriers - players can jump to any difficulty
+- **Desktop players** can also choose a fully custom piece count (2–1000) using the "Custom" button
 
 ## Implementation Details
 
@@ -125,6 +126,30 @@ Once a player has explicitly selected a difficulty:
 
 ✅ **Each difficulty level provides an appropriate challenge**: The exponential progression ensures that beginners have a gentle introduction while experts have a substantial challenge. The variety in grid dimensions and the descriptive labels help players understand what to expect at each level.
 
+## Custom Piece Count (Desktop Only)
+
+Desktop players can bypass the preset difficulty levels and enter any piece count from
+2 to 1000 via the **Custom** button in the difficulty row.
+
+### How It Works
+1. Click **Custom** in the difficulty row — the button highlights and a "Number of pieces" spinner appears.
+2. Set any value between **2** and **1000**.
+3. The game computes the best-fit grid targeting a 4:3 (landscape) aspect ratio:
+   ```gdscript
+   cols = round(sqrt(n * 4/3))
+   rows = round(n / cols)
+   ```
+   Because `cols` and `rows` are integers, the actual piece count (`cols × rows`) may
+   differ slightly from the requested value. The piece-count label shows both numbers
+   when they differ, e.g. **"105 requested → 108 pieces (12 × 9 grid)"**.
+4. Click **Start Puzzle** — the computed grid dimensions are passed to `GameState.cols` / `GameState.rows`.
+
+The custom selection persists across sessions just like preset difficulties.
+
+### Why Desktop Only
+On mobile devices, large piece counts produce pieces too small to tap reliably.
+The custom option is therefore hidden when `UIScale.is_mobile()` returns true.
+
 ## Future Enhancement Ideas
 
 While the current system meets all requirements, potential future improvements could include:
@@ -134,7 +159,6 @@ While the current system meets all requirements, potential future improvements c
 3. **Time Tracking**: Display average completion times for each difficulty
 4. **Achievements**: Unlock badges for completing puzzles at each difficulty
 5. **Recommended Difficulty**: AI-based suggestion after completing a puzzle
-6. **Custom Difficulty**: Allow players to set their own grid dimensions
 
 ## Testing
 
@@ -145,3 +169,5 @@ To verify the difficulty progression:
 4. Confirm piece counts match specifications
 5. Verify descriptions display correctly
 6. Test that difficulty selection persists across sessions
+7. On desktop, click "Custom", enter a value (e.g. 500), and verify the correct grid is shown
+8. Confirm the Custom button is absent on mobile
