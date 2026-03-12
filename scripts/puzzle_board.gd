@@ -25,7 +25,7 @@ const ConfettiEffect = preload("res://scripts/confetti_effect.gd")
 const PuzzleGlowEffect = preload("res://scripts/puzzle_glow_effect.gd")
 ## Main menu script – used as the single source of difficulty presets so that
 ## puzzle_board.gd stays in sync with main_menu.gd without duplicating data.
-const MainMenuScript = preload("res://scripts/main_menu.gd")
+const MainMenuScript = preload("res://scripts/ui/main_menu.gd")
 
 ## Height in pixels of the top HUD bar. Set dynamically based on
 ## orientation and screen scale so that portrait / mobile gets a taller bar

@@ -1,8 +1,143 @@
-[gd_scene load_steps=2 format=3 uid="uid://main_menu"]
+[gd_scene load_steps=3 format=3 uid="uid://main_menu"]
 
-[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1_menu"]
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1"]
+[ext_resource type="Theme" path="res://themes/ui_theme.tres" id="2"]
 
 [node name="MainMenu" type="Control"]
 anchor_right = 1.0
 anchor_bottom = 1.0
-script = ExtResource("1_menu")
+theme = ExtResource("2")
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.973, 0.941, 0.902, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="CenterContainer" type="CenterContainer" parent="MarginContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="MarginContainer/CenterContainer"]
+custom_minimum_size = Vector2(1100, 0)
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_constants/separation = 32
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+theme_override_constants/separation = 12
+
+[node name="TopSpacer" type="Control" parent="MarginContainer/CenterContainer/Content/TopBar"]
+size_flags_horizontal = 3
+
+[node name="LeaderboardButton" type="Button" parent="MarginContainer/CenterContainer/Content/TopBar"]
+custom_minimum_size = Vector2(44, 44)
+text = "🏆"
+
+[node name="SettingsButton" type="Button" parent="MarginContainer/CenterContainer/Content/TopBar"]
+custom_minimum_size = Vector2(44, 44)
+text = "⚙"
+
+[node name="Header" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/CenterContainer/Content/Header"]
+text = "Puzzle Champ"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.145, 0.125, 0.105, 1)
+
+[node name="SubtitleLabel" type="Label" parent="MarginContainer/CenterContainer/Content/Header"]
+text = "Choose a cozy scene and start relaxing"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.325, 0.298, 0.266, 1)
+autowrap_mode = 2
+
+[node name="SceneSelection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+theme_override_constants/separation = 12
+
+[node name="SceneLabel" type="Label" parent="MarginContainer/CenterContainer/Content/SceneSelection"]
+text = "Choose a Scene"
+theme_override_font_sizes/font_size = 20
+
+[node name="SceneGrid" type="GridContainer" parent="MarginContainer/CenterContainer/Content/SceneSelection"]
+columns = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+size_flags_horizontal = 3
+
+[node name="DifficultySelection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+theme_override_constants/separation = 10
+
+[node name="DifficultyLabel" type="Label" parent="MarginContainer/CenterContainer/Content/DifficultySelection"]
+text = "Difficulty"
+theme_override_font_sizes/font_size = 18
+
+[node name="DifficultyButtons" type="HBoxContainer" parent="MarginContainer/CenterContainer/Content/DifficultySelection"]
+theme_override_constants/separation = 10
+
+[node name="EasyButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+text = "Easy"
+size_flags_horizontal = 3
+
+[node name="MediumButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+text = "Medium"
+size_flags_horizontal = 3
+
+[node name="HardButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+text = "Hard"
+size_flags_horizontal = 3
+
+[node name="ExpertButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+text = "Expert"
+size_flags_horizontal = 3
+
+[node name="ShapeSelection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+theme_override_constants/separation = 10
+
+[node name="ShapeLabel" type="Label" parent="MarginContainer/CenterContainer/Content/ShapeSelection"]
+text = "Piece Shape"
+theme_override_font_sizes/font_size = 18
+
+[node name="ShapeButtons" type="HBoxContainer" parent="MarginContainer/CenterContainer/Content/ShapeSelection"]
+theme_override_constants/separation = 10
+
+[node name="SquareButton" type="Button" parent="MarginContainer/CenterContainer/Content/ShapeSelection/ShapeButtons"]
+text = "Square"
+size_flags_horizontal = 3
+
+[node name="JigsawButton" type="Button" parent="MarginContainer/CenterContainer/Content/ShapeSelection/ShapeButtons"]
+text = "Jigsaw"
+size_flags_horizontal = 3
+
+[node name="UploadSection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+
+[node name="UploadButton" type="Button" parent="MarginContainer/CenterContainer/Content/UploadSection"]
+text = "Upload Your Own Image"
+custom_minimum_size = Vector2(200, 48)
+
+[node name="StartSection" type="CenterContainer" parent="MarginContainer/CenterContainer/Content"]
+
+[node name="StartButton" type="Button" parent="MarginContainer/CenterContainer/Content/StartSection"]
+custom_minimum_size = Vector2(320, 60)
+text = "Start Puzzle"
+theme_override_font_sizes/font_size = 22
+
+[node name="UploadDialog" type="FileDialog" parent="."]
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.png,*.jpg,*.jpeg,*.webp ; Image Files")
