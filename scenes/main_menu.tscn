@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://main_menu"]
+[gd_scene load_steps=4 format=3 uid="uid://main_menu"]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1"]
 [ext_resource type="Theme" path="res://themes/ui_theme.tres" id="2"]
+[ext_resource type="Texture2D" path="res://docs/itchio/cover.png" id="3"]
 
 [node name="MainMenu" type="Control"]
 anchor_right = 1.0
@@ -9,131 +10,208 @@ anchor_bottom = 1.0
 theme = ExtResource("2")
 script = ExtResource("1")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="TextureRect" parent="."]
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0.973, 0.941, 0.902, 1)
+texture = ExtResource("3")
+expand_mode = 1
+stretch_mode = 6
+modulate = Color(1, 1, 1, 0.82)
+
+[node name="Overlay" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.06, 0.1, 0.72)
 
 [node name="MarginContainer" type="MarginContainer" parent="."]
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 32
 
-[node name="CenterContainer" type="CenterContainer" parent="MarginContainer"]
+[node name="Content" type="VBoxContainer" parent="MarginContainer"]
+custom_minimum_size = Vector2(1160, 0)
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_constants/separation = 18
+
+[node name="TopBar" type="HBoxContainer" parent="MarginContainer/Content"]
+theme_override_constants/separation = 14
+
+[node name="Brand" type="Label" parent="MarginContainer/Content/TopBar"]
+text = "Puzzle Champ"
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.96, 0.9, 0.82, 1)
+vertical_alignment = 1
+
+[node name="Tagline" type="Label" parent="MarginContainer/Content/TopBar"]
+text = "Relax, solve, and unwind"
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.82, 0.78, 0.72, 1)
+vertical_alignment = 1
+
+[node name="TopSpacer" type="Control" parent="MarginContainer/Content/TopBar"]
+size_flags_horizontal = 3
+
+[node name="LeaderboardButton" type="Button" parent="MarginContainer/Content/TopBar"]
+custom_minimum_size = Vector2(48, 44)
+text = "🏆"
+tooltip_text = "View leaderboard"
+
+[node name="SettingsButton" type="Button" parent="MarginContainer/Content/TopBar"]
+custom_minimum_size = Vector2(48, 44)
+text = "⚙"
+tooltip_text = "Settings"
+
+[node name="HeroPanel" type="HBoxContainer" parent="MarginContainer/Content"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 18
+
+[node name="HeroCopy" type="VBoxContainer" parent="MarginContainer/Content/HeroPanel"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Header" type="VBoxContainer" parent="MarginContainer/Content/HeroPanel/HeroCopy"]
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/Content/HeroPanel/HeroCopy/Header"]
+text = "Puzzle Champ"
+horizontal_alignment = 0
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.98, 0.9, 0.74, 1)
+
+[node name="SubtitleLabel" type="Label" parent="MarginContainer/Content/HeroPanel/HeroCopy/Header"]
+text = "Choose a cozy scene, set your challenge, and dive into the calm."
+horizontal_alignment = 0
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.86, 0.82, 0.78, 1)
+autowrap_mode = 2
+
+[node name="HeroActions" type="HBoxContainer" parent="MarginContainer/Content/HeroPanel/HeroCopy"]
+theme_override_constants/separation = 10
+
+[node name="ResumeButton" type="Button" parent="MarginContainer/Content/HeroPanel/HeroCopy/HeroActions"]
+text = "↺ Resume saved puzzle"
+custom_minimum_size = Vector2(220, 50)
+
+[node name="HeroStats" type="HBoxContainer" parent="MarginContainer/Content/HeroPanel/HeroCopy"]
+theme_override_constants/separation = 8
+
+[node name="StatBadge" type="Label" parent="MarginContainer/Content/HeroPanel/HeroCopy/HeroStats"]
+text = "Handcrafted pieces • Snap & rotate challenge • Saved progress"
+theme_override_colors/font_color = Color(0.86, 0.82, 0.78, 1)
+autowrap_mode = 2
+
+[node name="PlayOptions" type="VBoxContainer" parent="MarginContainer/Content/HeroPanel/HeroCopy"]
+theme_override_constants/separation = 8
+
+[node name="OptionsLabel" type="Label" parent="MarginContainer/Content/HeroPanel/HeroCopy/PlayOptions"]
+text = "Play style"
+theme_override_font_sizes/font_size = 16
+
+[node name="OptionsRow" type="HBoxContainer" parent="MarginContainer/Content/HeroPanel/HeroCopy/PlayOptions"]
+theme_override_constants/separation = 10
+
+[node name="RotationToggle" type="CheckButton" parent="MarginContainer/Content/HeroPanel/HeroCopy/PlayOptions/OptionsRow"]
+text = "Allow rotation"
+button_pressed = false
+
+[node name="SnapToggle" type="CheckButton" parent="MarginContainer/Content/HeroPanel/HeroCopy/PlayOptions/OptionsRow"]
+text = "Snap to board"
+button_pressed = true
+
+[node name="HeroCard" type="PanelContainer" parent="MarginContainer/Content/HeroPanel"]
+custom_minimum_size = Vector2(420, 260)
+size_flags_horizontal = 3
+
+[node name="HeroTexture" type="TextureRect" parent="MarginContainer/Content/HeroPanel/HeroCard"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+texture = ExtResource("3")
+stretch_mode = 6
+expand_mode = 1
+modulate = Color(1, 1, 1, 0.9)
 
-[node name="Content" type="VBoxContainer" parent="MarginContainer/CenterContainer"]
-custom_minimum_size = Vector2(1100, 0)
-size_flags_horizontal = 4
-size_flags_vertical = 4
-theme_override_constants/separation = 32
+[node name="SceneSelection" type="VBoxContainer" parent="MarginContainer/Content"]
+theme_override_constants/separation = 10
 
-[node name="TopBar" type="HBoxContainer" parent="MarginContainer/CenterContainer/Content"]
-theme_override_constants/separation = 12
-
-[node name="TopSpacer" type="Control" parent="MarginContainer/CenterContainer/Content/TopBar"]
-size_flags_horizontal = 3
-
-[node name="LeaderboardButton" type="Button" parent="MarginContainer/CenterContainer/Content/TopBar"]
-custom_minimum_size = Vector2(44, 44)
-text = "🏆"
-
-[node name="SettingsButton" type="Button" parent="MarginContainer/CenterContainer/Content/TopBar"]
-custom_minimum_size = Vector2(44, 44)
-text = "⚙"
-
-[node name="Header" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
-alignment = 1
-theme_override_constants/separation = 6
-
-[node name="TitleLabel" type="Label" parent="MarginContainer/CenterContainer/Content/Header"]
-text = "Puzzle Champ"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 48
-theme_override_colors/font_color = Color(0.145, 0.125, 0.105, 1)
-
-[node name="SubtitleLabel" type="Label" parent="MarginContainer/CenterContainer/Content/Header"]
-text = "Choose a cozy scene and start relaxing"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 18
-theme_override_colors/font_color = Color(0.325, 0.298, 0.266, 1)
-autowrap_mode = 2
-
-[node name="SceneSelection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
-theme_override_constants/separation = 12
-
-[node name="SceneLabel" type="Label" parent="MarginContainer/CenterContainer/Content/SceneSelection"]
+[node name="SceneLabel" type="Label" parent="MarginContainer/Content/SceneSelection"]
 text = "Choose a Scene"
 theme_override_font_sizes/font_size = 20
 
-[node name="SceneGrid" type="GridContainer" parent="MarginContainer/CenterContainer/Content/SceneSelection"]
+[node name="SceneGrid" type="GridContainer" parent="MarginContainer/Content/SceneSelection"]
 columns = 3
 theme_override_constants/h_separation = 12
 theme_override_constants/v_separation = 12
 size_flags_horizontal = 3
 
-[node name="DifficultySelection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+[node name="DifficultySelection" type="VBoxContainer" parent="MarginContainer/Content"]
 theme_override_constants/separation = 10
 
-[node name="DifficultyLabel" type="Label" parent="MarginContainer/CenterContainer/Content/DifficultySelection"]
+[node name="DifficultyLabel" type="Label" parent="MarginContainer/Content/DifficultySelection"]
 text = "Difficulty"
 theme_override_font_sizes/font_size = 18
 
-[node name="DifficultyButtons" type="HBoxContainer" parent="MarginContainer/CenterContainer/Content/DifficultySelection"]
+[node name="DifficultyButtons" type="HBoxContainer" parent="MarginContainer/Content/DifficultySelection"]
 theme_override_constants/separation = 10
 
-[node name="EasyButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+[node name="EasyButton" type="Button" parent="MarginContainer/Content/DifficultySelection/DifficultyButtons"]
 text = "Easy"
 size_flags_horizontal = 3
 
-[node name="MediumButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+[node name="MediumButton" type="Button" parent="MarginContainer/Content/DifficultySelection/DifficultyButtons"]
 text = "Medium"
 size_flags_horizontal = 3
 
-[node name="HardButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+[node name="HardButton" type="Button" parent="MarginContainer/Content/DifficultySelection/DifficultyButtons"]
 text = "Hard"
 size_flags_horizontal = 3
 
-[node name="ExpertButton" type="Button" parent="MarginContainer/CenterContainer/Content/DifficultySelection/DifficultyButtons"]
+[node name="ExpertButton" type="Button" parent="MarginContainer/Content/DifficultySelection/DifficultyButtons"]
 text = "Expert"
 size_flags_horizontal = 3
 
-[node name="ShapeSelection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+[node name="ShapeSelection" type="VBoxContainer" parent="MarginContainer/Content"]
 theme_override_constants/separation = 10
 
-[node name="ShapeLabel" type="Label" parent="MarginContainer/CenterContainer/Content/ShapeSelection"]
+[node name="ShapeLabel" type="Label" parent="MarginContainer/Content/ShapeSelection"]
 text = "Piece Shape"
 theme_override_font_sizes/font_size = 18
 
-[node name="ShapeButtons" type="HBoxContainer" parent="MarginContainer/CenterContainer/Content/ShapeSelection"]
+[node name="ShapeButtons" type="HBoxContainer" parent="MarginContainer/Content/ShapeSelection"]
 theme_override_constants/separation = 10
 
-[node name="SquareButton" type="Button" parent="MarginContainer/CenterContainer/Content/ShapeSelection/ShapeButtons"]
+[node name="SquareButton" type="Button" parent="MarginContainer/Content/ShapeSelection/ShapeButtons"]
 text = "Square"
 size_flags_horizontal = 3
 
-[node name="JigsawButton" type="Button" parent="MarginContainer/CenterContainer/Content/ShapeSelection/ShapeButtons"]
+[node name="JigsawButton" type="Button" parent="MarginContainer/Content/ShapeSelection/ShapeButtons"]
 text = "Jigsaw"
 size_flags_horizontal = 3
 
-[node name="UploadSection" type="VBoxContainer" parent="MarginContainer/CenterContainer/Content"]
+[node name="UploadSection" type="VBoxContainer" parent="MarginContainer/Content"]
+theme_override_constants/separation = 6
 
-[node name="UploadButton" type="Button" parent="MarginContainer/CenterContainer/Content/UploadSection"]
-text = "Upload Your Own Image"
-custom_minimum_size = Vector2(200, 48)
+[node name="UploadCopy" type="Label" parent="MarginContainer/Content/UploadSection"]
+text = "Bring your own cozy photo or select from the gallery."
+theme_override_colors/font_color = Color(0.86, 0.82, 0.78, 1)
+autowrap_mode = 2
 
-[node name="StartSection" type="CenterContainer" parent="MarginContainer/CenterContainer/Content"]
+[node name="UploadButton" type="Button" parent="MarginContainer/Content/UploadSection"]
+text = "Upload your own image"
+custom_minimum_size = Vector2(240, 48)
 
-[node name="StartButton" type="Button" parent="MarginContainer/CenterContainer/Content/StartSection"]
-custom_minimum_size = Vector2(320, 60)
+[node name="StartSection" type="CenterContainer" parent="MarginContainer/Content"]
+
+[node name="StartButton" type="Button" parent="MarginContainer/Content/StartSection"]
+custom_minimum_size = Vector2(340, 64)
 text = "Start Puzzle"
 theme_override_font_sizes/font_size = 22
 
