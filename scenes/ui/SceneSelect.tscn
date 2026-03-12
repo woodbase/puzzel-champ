@@ -79,7 +79,11 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 color = Color(0.04, 0.05, 0.12, 0.82)
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="SafeArea" type="SafeArea" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="MarginContainer" type="MarginContainer" parent="SafeArea"]
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
@@ -89,44 +93,44 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 28
 theme_override_constants/margin_bottom = 20
 
-[node name="OuterVBox" type="VBoxContainer" parent="MarginContainer"]
+[node name="OuterVBox" type="VBoxContainer" parent="SafeArea/MarginContainer"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 12
 
-[node name="TitleBanner" type="PanelContainer" parent="MarginContainer/OuterVBox"]
+[node name="TitleBanner" type="PanelContainer" parent="SafeArea/MarginContainer/OuterVBox"]
 size_flags_horizontal = 4
 theme_override_styles/panel = SubResource("StyleBoxFlat_title_banner")
 
-[node name="TitleLabel" type="Label" parent="MarginContainer/OuterVBox/TitleBanner"]
+[node name="TitleLabel" type="Label" parent="SafeArea/MarginContainer/OuterVBox/TitleBanner"]
 text = "✦  CHOOSE A SCENE  ✦"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 26
 theme_override_colors/font_color = Color(1.0, 0.86, 0.22, 1)
 
-[node name="MainLayout" type="HBoxContainer" parent="MarginContainer/OuterVBox"]
+[node name="MainLayout" type="HBoxContainer" parent="SafeArea/MarginContainer/OuterVBox"]
 unique_name_in_owner = true
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 20
 
-[node name="ImageGallery" type="PanelContainer" parent="MarginContainer/OuterVBox/MainLayout"]
+[node name="ImageGallery" type="PanelContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_gallery")
 
-[node name="GalleryMargin" type="MarginContainer" parent="MarginContainer/OuterVBox/MainLayout/ImageGallery"]
+[node name="GalleryMargin" type="MarginContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/ImageGallery"]
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="GalleryContent" type="VBoxContainer" parent="MarginContainer/OuterVBox/MainLayout/ImageGallery/GalleryMargin"]
+[node name="GalleryContent" type="VBoxContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/ImageGallery/GalleryMargin"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 14
 
-[node name="SceneGrid" type="GridContainer" parent="MarginContainer/OuterVBox/MainLayout/ImageGallery/GalleryMargin/GalleryContent"]
+[node name="SceneGrid" type="GridContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/ImageGallery/GalleryMargin/GalleryContent"]
 unique_name_in_owner = true
 columns = 3
 size_flags_horizontal = 3
@@ -134,41 +138,41 @@ size_flags_vertical = 3
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
 
-[node name="UploadImageButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/ImageGallery/GalleryMargin/GalleryContent"]
+[node name="UploadImageButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/ImageGallery/GalleryMargin/GalleryContent"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 54)
 size_flags_horizontal = 3
 text = "⬆  Upload Your Own Image"
 theme_override_font_sizes/font_size = 18
 
-[node name="PuzzleSettingsPanel" type="PanelContainer" parent="MarginContainer/OuterVBox/MainLayout"]
+[node name="PuzzleSettingsPanel" type="PanelContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout"]
 custom_minimum_size = Vector2(320, 0)
 size_flags_vertical = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_settings")
 
-[node name="SettingsMargin" type="MarginContainer" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel"]
+[node name="SettingsMargin" type="MarginContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel"]
 theme_override_constants/margin_left = 18
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 18
 theme_override_constants/margin_bottom = 16
 
-[node name="SettingsContent" type="VBoxContainer" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin"]
+[node name="SettingsContent" type="VBoxContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin"]
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 14
 
-[node name="SettingsTitle" type="Label" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="SettingsTitle" type="Label" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 text = "✦ PUZZLE SETTINGS ✦"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 20
 theme_override_colors/font_color = Color(1.0, 0.86, 0.22, 1)
 
-[node name="PreviewPanel" type="PanelContainer" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="PreviewPanel" type="PanelContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 custom_minimum_size = Vector2(0, 200)
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StyleBoxFlat_preview_panel")
 
-[node name="PreviewImage" type="TextureRect" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/PreviewPanel"]
+[node name="PreviewImage" type="TextureRect" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/PreviewPanel"]
 unique_name_in_owner = true
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -177,73 +181,73 @@ grow_vertical = 2
 stretch_mode = 4
 mouse_filter = 2
 
-[node name="DifficultyLabel" type="Label" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="DifficultyLabel" type="Label" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 text = "• DIFFICULTY •"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.96, 0.82, 0.62, 1)
 
-[node name="DifficultyButtons" type="HBoxContainer" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="DifficultyButtons" type="HBoxContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="EasyButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
+[node name="EasyButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
 unique_name_in_owner = true
 text = "Easy"
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 15
 
-[node name="MediumButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
+[node name="MediumButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
 unique_name_in_owner = true
 text = "Medium"
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 15
 
-[node name="HardButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
+[node name="HardButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
 unique_name_in_owner = true
 text = "Hard"
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 15
 
-[node name="ExpertButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
+[node name="ExpertButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/DifficultyButtons"]
 unique_name_in_owner = true
 text = "Expert"
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 15
 
-[node name="PieceStyleLabel" type="Label" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="PieceStyleLabel" type="Label" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 text = "• PIECE STYLE •"
 horizontal_alignment = 1
 theme_override_font_sizes/font_size = 15
 theme_override_colors/font_color = Color(0.96, 0.82, 0.62, 1)
 
-[node name="PieceStyleButtons" type="HBoxContainer" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="PieceStyleButtons" type="HBoxContainer" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 size_flags_horizontal = 3
 theme_override_constants/separation = 10
 
-[node name="SquareButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/PieceStyleButtons"]
+[node name="SquareButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/PieceStyleButtons"]
 unique_name_in_owner = true
 text = "⬜ Square"
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 16
 
-[node name="JigsawButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/PieceStyleButtons"]
+[node name="JigsawButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent/PieceStyleButtons"]
 unique_name_in_owner = true
 text = "🧩 Jigsaw"
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 16
 
-[node name="StartSpacer" type="Control" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="StartSpacer" type="Control" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 size_flags_vertical = 3
 
-[node name="StartPuzzleButton" type="Button" parent="MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
+[node name="StartPuzzleButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox/MainLayout/PuzzleSettingsPanel/SettingsMargin/SettingsContent"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 62)
 size_flags_horizontal = 3
 text = "🧩  START PUZZLE"
 theme_override_font_sizes/font_size = 22
 
-[node name="BackButton" type="Button" parent="MarginContainer/OuterVBox"]
+[node name="BackButton" type="Button" parent="SafeArea/MarginContainer/OuterVBox"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(130, 48)
 size_flags_horizontal = 0
@@ -254,3 +258,4 @@ theme_override_font_sizes/font_size = 18
 file_mode = 0
 access = 2
 filters = PackedStringArray("*.png,*.jpg,*.jpeg,*.webp ; Image Files")
+

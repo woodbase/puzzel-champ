@@ -80,6 +80,7 @@ func _load_saved_puzzle_data() -> bool:
 	if path != "":
 		var img := Image.load_from_file(path)
 		if img != null:
+			_limit_image_size(img)
 			tex = ImageTexture.create_from_image(img)
 
 	if tex == null and GameState.image_texture != null:
@@ -167,6 +168,19 @@ func _add_button_feedback(btn: Button) -> void:
 func _create_feedback_tween(ctrl: Control, target: Vector2, duration: float) -> void:
 	var tween := create_tween()
 	tween.tween_property(ctrl, "scale", target, duration).set_trans(Tween.TRANS_SINE)
+
+
+# ─── Image utilities ─────────────────────────────────────────────────────────
+
+const _MAX_IMAGE_DIMENSION := 2048
+
+func _limit_image_size(img: Image) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	if w <= _MAX_IMAGE_DIMENSION and h <= _MAX_IMAGE_DIMENSION:
+		return
+	var scale: float = float(_MAX_IMAGE_DIMENSION) / float(maxi(w, h))
+	img.resize(int(w * scale), int(h * scale), Image.INTERPOLATE_LANCZOS)
 
 
 # ─── Error dialog ────────────────────────────────────────────────────────────
