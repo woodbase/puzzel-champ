@@ -62,11 +62,16 @@ var _scene_group := ButtonGroup.new()
 
 
 func _ready() -> void:
-	_upload_button.pressed.connect(_on_upload_pressed)
-	_upload_dialog.file_selected.connect(_on_file_selected)
-	_start_button.pressed.connect(_on_start_pressed)
-	_leaderboard_button.pressed.connect(_on_leaderboard_pressed)
-	_settings_button.pressed.connect(_on_settings_pressed)
+	if _upload_button != null:
+		_upload_button.pressed.connect(_on_upload_pressed)
+	if _upload_dialog != null:
+		_upload_dialog.file_selected.connect(_on_file_selected)
+	if _start_button != null:
+		_start_button.pressed.connect(_on_start_pressed)
+	if _leaderboard_button != null:
+		_leaderboard_button.pressed.connect(_on_leaderboard_pressed)
+	if _settings_button != null:
+		_settings_button.pressed.connect(_on_settings_pressed)
 	if _resume_button != null:
 		_resume_button.pressed.connect(_on_resume_pressed)
 	if _rotation_toggle != null:
@@ -87,14 +92,18 @@ func _ready() -> void:
 	_apply_responsive_layout()
 	_refresh_resume_button(GameState.has_save)
 
-	_add_button_feedback(_upload_button)
-	_add_button_feedback(_start_button, true)
+	if _upload_button != null:
+		_add_button_feedback(_upload_button)
+	if _start_button != null:
+		_add_button_feedback(_start_button, true)
 	for btn: Button in _difficulty_buttons.values():
 		_add_button_feedback(btn)
 	for btn2: Button in _shape_buttons.values():
 		_add_button_feedback(btn2)
-	_add_button_feedback(_leaderboard_button)
-	_add_button_feedback(_settings_button)
+	if _leaderboard_button != null:
+		_add_button_feedback(_leaderboard_button)
+	if _settings_button != null:
+		_add_button_feedback(_settings_button)
 	_apply_start_button_style()
 
 
