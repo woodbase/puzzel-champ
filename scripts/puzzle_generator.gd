@@ -57,7 +57,7 @@ func generate_edges(cols: int, rows: int) -> Array:
 
 
 ## Fraction of piece_size used as the tab protrusion depth.
-const TAB_DEPTH_RATIO: float = 0.25
+const TAB_DEPTH_RATIO: float = 0.26
 
 ## Generates a polygon for the given piece.
 ## piece_w and piece_h are the cell dimensions in image-space pixels (may differ
@@ -107,28 +107,24 @@ func _jigsaw_polygon(piece_data: PieceData, piece_w: int, piece_h: int) -> Packe
 	return polygon
 
 
-# Tab shape constants (fractions of edge length / depth).
-const _TAB_FLAT: float = 0.3
-const _TAB_NECK_MID: float = 0.35
-const _TAB_NECK_END: float = 0.4
-const _TAB_HEAD_EDGE: float = 0.45
-const _TAB_NECK_DEPTH: float = 0.5
-const _TAB_NECK_UPPER: float = 0.8
-const _TAB_HEAD_BULGE: float = 1.3
-## Bezier subdivision steps per curve segment on desktop.
-const _BEZIER_STEPS: int = 5
-## Reduced steps for mobile to lower polygon complexity and fill cost.
-const _BEZIER_STEPS_MOBILE: int = 3
+## Tab shape constants. Values are fractions of edge length / tab depth.
+const _TAB_FLAT: float = 0.18
+const _TAB_NECK_PINCH: float = 0.55
+const _TAB_HEAD_GAIN: float = 1.1
+## Sample points along each edge to approximate the rounded tab profile.
+const _TAB_SAMPLES: int = 18
+## Reduced samples on mobile to keep polygon complexity lower.
+const _TAB_SAMPLES_MOBILE: int = 12
 
 
-# Appends Bezier-sampled tab points between p_start and p_end.
+# Appends rounded tab points between p_start and p_end.
 func _add_tab_points(polygon: PackedVector2Array, p_start: Vector2, p_end: Vector2, edge_type: int, tab_depth: float) -> void:
 	if edge_type == EdgeType.FLAT:
 		return
 
 	# Use fewer curve segments on mobile to reduce polygon vertex count and
 	# the per-piece scanline fill cost without noticeably changing piece shape.
-	var steps: int = _BEZIER_STEPS_MOBILE if GameState.is_mobile else _BEZIER_STEPS
+	var steps: int = _TAB_SAMPLES_MOBILE if GameState.is_mobile else _TAB_SAMPLES
 
 	var along: Vector2 = p_end - p_start
 	var length: float = along.length()
@@ -137,41 +133,23 @@ func _add_tab_points(polygon: PackedVector2Array, p_start: Vector2, p_end: Vecto
 	var normal: Vector2 = Vector2(t_vec.y, -t_vec.x)
 	var depth: float = tab_depth if edge_type == EdgeType.OUT else -tab_depth
 
-	var tab_start := p_start + t_vec * (length * _TAB_FLAT)
-	var head_left := _TAB_HEAD_EDGE
-	var head_right := 1.0 - _TAB_HEAD_EDGE
+	var tab_start_s: float = _TAB_FLAT
+	var tab_end_s: float = 1.0 - _TAB_FLAT
+	var tab_width: float = tab_end_s - tab_start_s
 
-	var b1_p0 := tab_start
-	var b1_p1 := p_start + t_vec * (length * _TAB_NECK_MID) + normal * (depth * _TAB_NECK_DEPTH)
-	var b1_p2 := p_start + t_vec * (length * _TAB_NECK_END) + normal * (depth * _TAB_NECK_UPPER)
-	var b1_p3 := p_start + t_vec * (length * head_left) + normal * depth
+	for i in range(1, steps):
+		var s: float = float(i) / float(steps)
+		var y_offset: float = 0.0
 
-	var b2_p0 := b1_p3
-	var b2_p1 := p_start + t_vec * (length * head_left) + normal * (depth * _TAB_HEAD_BULGE)
-	var b2_p2 := p_start + t_vec * (length * head_right) + normal * (depth * _TAB_HEAD_BULGE)
-	var b2_p3 := p_start + t_vec * (length * head_right) + normal * depth
+		if s >= tab_start_s and s <= tab_end_s:
+			var u: float = (s - tab_start_s) / tab_width  # Normalised position across the tab (0..1).
+			var dome: float = sin(u * PI)                 # Smooth rise/fall with zero slope at both ends.
+			var neck: float = lerp(_TAB_NECK_PINCH, 1.0, dome)  # Slight waist near the tab base.
+			var head: float = lerp(1.0, _TAB_HEAD_GAIN, dome)   # Rounder head at the peak.
+			y_offset = depth * dome * neck * head
 
-	var b3_p0 := b2_p3
-	var b3_p1 := p_start + t_vec * (length * (1.0 - _TAB_NECK_END)) + normal * (depth * _TAB_NECK_UPPER)
-	var b3_p2 := p_start + t_vec * (length * (1.0 - _TAB_NECK_MID)) + normal * (depth * _TAB_NECK_DEPTH)
-	var b3_p3 := p_start + t_vec * (length * (1.0 - _TAB_FLAT))
-
-	polygon.append(tab_start)
-	for i in range(1, steps + 1):
-		var tv: float = float(i) / float(steps)
-		polygon.append(_cubic_bezier(b1_p0, b1_p1, b1_p2, b1_p3, tv))
-	for i in range(1, steps + 1):
-		var tv: float = float(i) / float(steps)
-		polygon.append(_cubic_bezier(b2_p0, b2_p1, b2_p2, b2_p3, tv))
-	for i in range(1, steps + 1):
-		var tv: float = float(i) / float(steps)
-		polygon.append(_cubic_bezier(b3_p0, b3_p1, b3_p2, b3_p3, tv))
-
-
-# Evaluates a cubic Bezier curve at parameter t in [0, 1].
-func _cubic_bezier(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: float) -> Vector2:
-	var u: float = 1.0 - t
-	return u * u * u * p0 + 3.0 * u * u * t * p1 + 3.0 * u * t * t * p2 + t * t * t * p3
+		var point := p_start + t_vec * (length * s) + normal * y_offset
+		polygon.append(point)
 
 
 ## Creates a masked puzzle-piece texture from the source image.
@@ -189,7 +167,7 @@ func create_piece_texture(image: Image, region: Rect2i, polygon: PackedVector2Ar
 	var padding: int
 	if shape == PieceShape.JIGSAW:
 		var tab_depth := float(min(region.size.x, region.size.y)) * TAB_DEPTH_RATIO
-		padding = int(ceil(tab_depth * _TAB_HEAD_BULGE))
+		padding = int(ceil(tab_depth * _TAB_HEAD_GAIN))
 	else:
 		padding = 0
 
