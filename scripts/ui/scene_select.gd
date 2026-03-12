@@ -43,6 +43,7 @@ var _preview_tween: Tween = null
 @onready var _upload_dialog: FileDialog = $UploadDialog
 @onready var _preview_image: TextureRect = %PreviewImage
 @onready var _start_button: Button = %StartPuzzleButton
+@onready var _back_button: Button = %BackButton
 
 @onready var _difficulty_buttons: Dictionary = {
 	"easy": %EasyButton,
@@ -61,6 +62,7 @@ func _ready() -> void:
 	_upload_button.pressed.connect(_on_upload_pressed)
 	_upload_dialog.file_selected.connect(_on_file_selected)
 	_start_button.pressed.connect(_on_start_puzzle_pressed)
+	_back_button.pressed.connect(_on_back_pressed)
 	UIScale.layout_changed.connect(_apply_responsive_layout)
 
 	_init_difficulty_buttons()
@@ -71,8 +73,11 @@ func _ready() -> void:
 	_restore_previous_selection()
 
 	_apply_start_button_style()
+	_style_upload_button()
+	_style_back_button()
 	_add_button_feedback(_upload_button)
 	_add_button_feedback(_start_button, true)
+	_add_button_feedback(_back_button)
 	for btn: Button in _difficulty_buttons.values():
 		_add_button_feedback(btn)
 	for btn2: Button in _piece_style_buttons.values():
@@ -394,6 +399,10 @@ func _on_start_puzzle_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/game/puzzle_scene.tscn")
 
 
+func _on_back_pressed() -> void:
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
 func _show_error(text: String) -> void:
 	var dialog := AcceptDialog.new()
 	dialog.title = "Oops"
@@ -406,25 +415,42 @@ func _show_error(text: String) -> void:
 
 
 func _apply_start_button_style() -> void:
-	var accent := get_theme_color("accent_color", "Button")
+	_apply_pill_style(_start_button, Color(0.88, 0.66, 0.08), Color(1.0, 0.88, 0.28), 22)
+
+
+func _style_upload_button() -> void:
+	_apply_pill_style(_upload_button, Color(0.2, 0.4, 0.76), Color(0.44, 0.66, 0.98), 20)
+
+
+func _style_back_button() -> void:
+	_apply_pill_style(_back_button, Color(0.18, 0.36, 0.62), Color(0.36, 0.6, 0.9), 20)
+
+
+func _apply_pill_style(btn: Button, base: Color, highlight: Color, radius: int) -> void:
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = accent.lightened(0.05)
-	normal.corner_radius_top_left = 18
-	normal.corner_radius_top_right = 18
-	normal.corner_radius_bottom_left = 18
-	normal.corner_radius_bottom_right = 18
-	normal.shadow_size = 14
-	normal.shadow_color = Color(0, 0, 0, 0.18)
+	normal.bg_color = base
+	normal.corner_radius_top_left = radius
+	normal.corner_radius_top_right = radius
+	normal.corner_radius_bottom_left = radius
+	normal.corner_radius_bottom_right = radius
+	normal.shadow_size = 12
+	normal.shadow_color = Color(0, 0, 0, 0.3)
+	normal.border_width_left = 2
+	normal.border_width_top = 2
+	normal.border_width_right = 2
+	normal.border_width_bottom = 2
+	normal.border_color = highlight
 
 	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = accent.lightened(0.12)
+	hover.bg_color = base.lightened(0.1)
+	hover.border_color = highlight.lightened(0.08)
 	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = accent.darkened(0.1)
+	pressed.bg_color = base.darkened(0.1)
 
-	_start_button.add_theme_stylebox_override("normal", normal)
-	_start_button.add_theme_stylebox_override("hover", hover)
-	_start_button.add_theme_stylebox_override("pressed", pressed)
-	_start_button.add_theme_color_override("font_color", Color(1, 1, 1))
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", pressed)
+	btn.add_theme_color_override("font_color", Color(1, 1, 1))
 
 
 func _style_difficulty_buttons() -> void:
@@ -437,19 +463,19 @@ func _style_difficulty_buttons() -> void:
 		var selected := difficulty == key
 
 		var normal := StyleBoxFlat.new()
-		normal.bg_color = base if selected else base.darkened(0.18)
-		normal.corner_radius_top_left = 12
-		normal.corner_radius_top_right = 12
-		normal.corner_radius_bottom_left = 12
-		normal.corner_radius_bottom_right = 12
+		normal.bg_color = base if selected else base.darkened(0.22)
+		normal.corner_radius_top_left = 14
+		normal.corner_radius_top_right = 14
+		normal.corner_radius_bottom_left = 14
+		normal.corner_radius_bottom_right = 14
 		normal.shadow_size = 10
-		normal.shadow_color = Color(0, 0, 0, 0.12)
+		normal.shadow_color = Color(0, 0, 0, 0.18)
 		if selected:
 			normal.border_width_left = 2
 			normal.border_width_top = 2
 			normal.border_width_right = 2
 			normal.border_width_bottom = 2
-			normal.border_color = Color(1, 1, 1, 0.8)
+			normal.border_color = Color(1, 1, 1, 0.82)
 
 		var hover := normal.duplicate() as StyleBoxFlat
 		hover.bg_color = base.lightened(0.08)
@@ -469,27 +495,27 @@ func _style_piece_style_buttons() -> void:
 			continue
 		var btn := _piece_style_buttons[key] as Button
 		var selected := piece_style == key
-		var base := get_theme_color("accent_color", "Button")
+		var base := Color(0.28, 0.44, 0.72)
 
 		var normal := StyleBoxFlat.new()
-		normal.bg_color = base.lightened(0.16) if selected else base.darkened(0.25)
-		normal.corner_radius_top_left = 12
-		normal.corner_radius_top_right = 12
-		normal.corner_radius_bottom_left = 12
-		normal.corner_radius_bottom_right = 12
+		normal.bg_color = base.lightened(0.16) if selected else base.darkened(0.2)
+		normal.corner_radius_top_left = 14
+		normal.corner_radius_top_right = 14
+		normal.corner_radius_bottom_left = 14
+		normal.corner_radius_bottom_right = 14
 		normal.shadow_size = 8
-		normal.shadow_color = Color(0, 0, 0, 0.1)
+		normal.shadow_color = Color(0, 0, 0, 0.14)
 		if selected:
 			normal.border_width_left = 2
 			normal.border_width_top = 2
 			normal.border_width_right = 2
 			normal.border_width_bottom = 2
-			normal.border_color = Color(1, 1, 1, 0.7)
+			normal.border_color = Color(1, 1, 1, 0.72)
 
 		var hover := normal.duplicate() as StyleBoxFlat
-		hover.bg_color = base.lightened(0.22)
+		hover.bg_color = base.lightened(0.24)
 		var pressed := normal.duplicate() as StyleBoxFlat
-		pressed.bg_color = base.darkened(0.1)
+		pressed.bg_color = base.darkened(0.08)
 
 		btn.add_theme_stylebox_override("normal", normal)
 		btn.add_theme_stylebox_override("hover", hover)
@@ -523,3 +549,4 @@ func _add_button_feedback(btn: Button, brighten_on_hover: bool = false) -> void:
 func _create_feedback_tween(ctrl: Control, target: Vector2, duration: float) -> void:
 	var tween := create_tween()
 	tween.tween_property(ctrl, "scale", target, duration).set_trans(Tween.TRANS_SINE)
+
