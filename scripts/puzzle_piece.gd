@@ -133,7 +133,8 @@ func _end_drag() -> void:
 	var correct_global: Vector2 = parent_2d.to_global(correct_position)
 	var distance := global_position.distance_to(correct_global)
 	if distance < snap_distance:
-		global_position = correct_global
+		if GameState.snap_to_board:
+			global_position = correct_global
 		is_locked = true
 		input_pickable = false
 		if GameState.feedback_haptic:
