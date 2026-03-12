@@ -8,7 +8,7 @@ func test_generate_square_pieces_returns_expected_count_and_size() -> void:
 	img.fill(Color.DIM_GRAY)
 	var tex := ImageTexture.create_from_image(img)
 
-	var pieces := PuzzleGenerator.generate_pieces(tex, 2, PuzzleGenerator.PieceShape.SQUARE)
+	var pieces: Array = PuzzleGenerator.generate_pieces(tex, 2, PuzzleGenerator.PieceShape.SQUARE)
 
 	assert_int(pieces.size()).is_equal(4)
 	for piece in pieces:
@@ -22,7 +22,7 @@ func test_generate_pieces_resizes_to_grid_multiple() -> void:
 	img.fill(Color(0.2, 0.4, 0.6, 1.0))
 	var tex := ImageTexture.create_from_image(img)
 
-	var pieces := PuzzleGenerator.generate_pieces(tex, 2, PuzzleGenerator.PieceShape.SQUARE)
+	var pieces: Array = PuzzleGenerator.generate_pieces(tex, 2, PuzzleGenerator.PieceShape.SQUARE)
 
 	assert_int(pieces.size()).is_equal(4)
 	for piece in pieces:
@@ -44,7 +44,7 @@ func test_create_piece_texture_square_preserves_pixels() -> void:
 		Vector2(0, 2),
 	])
 
-	var tex := PuzzleGenerator.create_piece_texture(
+	var tex := PuzzleGenerator.new().create_piece_texture(
 		img,
 		Rect2i(Vector2i.ZERO, Vector2i(2, 2)),
 		polygon,
@@ -52,8 +52,8 @@ func test_create_piece_texture_square_preserves_pixels() -> void:
 	)
 	var result := tex.get_image()
 
-	assert_vector2(result.get_size()).is_equal(Vector2(2, 2))
-	assert_color(result.get_pixel(0, 0)).is_equal(Color.RED)
-	assert_color(result.get_pixel(1, 0)).is_equal(Color.GREEN)
-	assert_color(result.get_pixel(0, 1)).is_equal(Color.BLUE)
-	assert_color(result.get_pixel(1, 1)).is_equal(Color.WHITE)
+	assert_vector(result.get_size()).is_equal(Vector2(2, 2))
+	assert_that(result.get_pixel(0, 0)).is_equal(Color.RED)
+	assert_that(result.get_pixel(1, 0)).is_equal(Color.GREEN)
+	assert_that(result.get_pixel(0, 1)).is_equal(Color.BLUE)
+	assert_that(result.get_pixel(1, 1)).is_equal(Color.WHITE)

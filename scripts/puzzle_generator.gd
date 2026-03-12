@@ -24,6 +24,29 @@ class PieceData:
 	}
 
 
+## Slices an ImageTexture into a grid of square piece textures.
+## Returns an Array of ImageTexture ordered row-by-row, left-to-right.
+## The shape parameter is accepted for API compatibility; only SQUARE slicing
+## is implemented (JIGSAW falls back to SQUARE).
+static func generate_pieces(texture: ImageTexture, cols_rows: int, shape: int = PieceShape.SQUARE) -> Array:
+	var image := texture.get_image()
+	var iw := int(image.get_size().x)
+	var ih := int(image.get_size().y)
+	var piece_w := iw / cols_rows
+	var piece_h := ih / cols_rows
+	var target_w := cols_rows * piece_w
+	var target_h := cols_rows * piece_h
+	if iw != target_w or ih != target_h:
+		image.resize(target_w, target_h, Image.INTERPOLATE_LANCZOS)
+	var pieces: Array = []
+	for row in range(cols_rows):
+		for col in range(cols_rows):
+			var piece_image := Image.create(piece_w, piece_h, false, image.get_format())
+			piece_image.blit_rect(image, Rect2i(col * piece_w, row * piece_h, piece_w, piece_h), Vector2i.ZERO)
+			pieces.append(ImageTexture.create_from_image(piece_image))
+	return pieces
+
+
 ## Generates PieceData for all pieces in a cols x rows grid.
 ## Border edges are FLAT; shared internal edges are randomly IN or OUT
 ## with the neighbour always receiving the opposite value.
