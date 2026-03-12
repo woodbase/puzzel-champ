@@ -155,6 +155,9 @@ func _load_user_gallery() -> void:
 
 
 func _build_scene_cards() -> void:
+	if _scene_grid == null:
+		push_warning("_scene_grid is null; SceneGrid node may be missing from the scene.")
+		return
 	_scene_cards.clear()
 	for child in _scene_grid.get_children():
 		child.queue_free()
