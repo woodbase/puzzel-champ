@@ -18,7 +18,7 @@ jobs:
           unzip Godot_v4.6-stable_linux.x86_64.zip
       - name: Install gdUnit4
         run: |
-           wget https://github.com/MikeSchulze/gdUnit4/releases/latest/download/gdUnit4.zip
+           wget https://github.com/godot-gdunit-labs/gdUnit4/archive/refs/tags/v6.1.1.zip
            unzip gdUnit4.zip -d addons/gdUnit4
 
       - name: Run Tests
