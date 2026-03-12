@@ -44,6 +44,9 @@ var _scene_group := ButtonGroup.new()
 @onready var _start_button: Button = %StartButton
 @onready var _leaderboard_button: Button = %LeaderboardButton
 @onready var _settings_button: Button = %SettingsButton
+@onready var _resume_button: Button = %ResumeButton
+@onready var _rotation_toggle: CheckButton = %RotationToggle
+@onready var _snap_toggle: CheckButton = %SnapToggle
 
 @onready var _difficulty_buttons: Dictionary = {
 	"easy": %EasyButton,
@@ -64,6 +67,16 @@ func _ready() -> void:
 	_start_button.pressed.connect(_on_start_pressed)
 	_leaderboard_button.pressed.connect(_on_leaderboard_pressed)
 	_settings_button.pressed.connect(_on_settings_pressed)
+	if _resume_button != null:
+		_resume_button.pressed.connect(_on_resume_pressed)
+	if _rotation_toggle != null:
+		_rotation_toggle.toggled.connect(func(pressed: bool) -> void:
+			GameState.allow_rotation = pressed
+		)
+	if _snap_toggle != null:
+		_snap_toggle.toggled.connect(func(pressed: bool) -> void:
+			GameState.snap_to_board = pressed
+		)
 	UIScale.layout_changed.connect(_apply_responsive_layout)
 
 	_load_gallery()
@@ -72,6 +85,7 @@ func _ready() -> void:
 	_init_shape_buttons()
 	_restore_previous_selection()
 	_apply_responsive_layout()
+	_refresh_resume_button(GameState.has_save)
 
 	_add_button_feedback(_upload_button)
 	_add_button_feedback(_start_button, true)
@@ -157,6 +171,11 @@ func _restore_previous_selection() -> void:
 			_set_difficulty(saved_diff)
 	else:
 		_set_difficulty(difficulty)
+
+	if _rotation_toggle != null:
+		_rotation_toggle.button_pressed = GameState.allow_rotation
+	if _snap_toggle != null:
+		_snap_toggle.button_pressed = GameState.snap_to_board
 
 	if GameState.image_texture != null:
 		var idx := GameState.gallery_index
@@ -331,6 +350,9 @@ func _on_start_pressed() -> void:
 		_show_error("Please select a scene first.")
 		return
 
+	GameState.allow_rotation = _rotation_toggle.button_pressed if _rotation_toggle != null else GameState.allow_rotation
+	GameState.snap_to_board = _snap_toggle.button_pressed if _snap_toggle != null else GameState.snap_to_board
+
 	PuzzleConfig.scene = selected_scene
 	PuzzleConfig.scene_path = selected_path
 	PuzzleConfig.gallery_index = selected_index
@@ -358,6 +380,76 @@ func _show_error(text: String) -> void:
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)
 	dialog.close_requested.connect(dialog.queue_free)
+
+
+func _refresh_resume_button(show: bool) -> void:
+	if _resume_button == null:
+		return
+	_resume_button.visible = show
+	_resume_button.disabled = not show
+
+
+func _on_resume_pressed() -> void:
+	if not _load_saved_puzzle_data():
+		_show_error("No saved puzzle found to resume.")
+		_refresh_resume_button(false)
+		GameState.has_save = false
+		return
+
+	GameState.resume_save = true
+	get_tree().change_scene_to_file("res://scenes/game/puzzle_scene.tscn")
+
+
+func _load_saved_puzzle_data() -> bool:
+	if not FileAccess.file_exists(GameState.SAVE_PATH):
+		return false
+	var file := FileAccess.open(GameState.SAVE_PATH, FileAccess.READ)
+	if file == null:
+		return false
+	var text := file.get_as_text()
+	file.close()
+
+	var json := JSON.new()
+	if json.parse(text) != OK:
+		return false
+	var data := json.get_data()
+	if not (data is Dictionary):
+		return false
+	var payload := data as Dictionary
+
+	var path := payload.get("image_path", "") as String
+	var tex: Texture2D = null
+	if path != "":
+		var img := Image.load_from_file(path)
+		if img != null:
+			_limit_image_size(img)
+			tex = ImageTexture.create_from_image(img)
+
+	if tex == null and GameState.image_texture != null:
+		tex = GameState.image_texture
+
+	if tex == null:
+		return false
+
+	GameState.image_path = path
+	GameState.image_texture = tex
+	GameState.gallery_index = int(payload.get("gallery_index", GameState.gallery_index))
+	GameState.cols = int(payload.get("cols", GameState.cols))
+	GameState.rows = int(payload.get("rows", GameState.rows))
+	GameState.piece_shape = payload.get("piece_shape", GameState.piece_shape) as String
+	GameState.allow_rotation = bool(payload.get("allow_rotation", GameState.allow_rotation))
+	GameState.snap_to_board = bool(payload.get("snap_to_board", GameState.snap_to_board))
+	GameState.difficulty_explicitly_set = true
+
+	# Sync the menu selection to the saved slot if possible.
+	if GameState.gallery_index >= 0 and GameState.gallery_index < _scene_cards.size():
+		_on_scene_selected(GameState.gallery_index)
+	var saved_diff := _find_difficulty_key(GameState.cols, GameState.rows)
+	if saved_diff != "":
+		_set_difficulty(saved_diff)
+	_set_shape(GameState.piece_shape)
+	_refresh_resume_button(true)
+	return true
 
 
 func _apply_start_button_style() -> void:
