@@ -83,7 +83,7 @@ While the system provides smart defaults, players always have full control:
 ## Implementation Details
 
 ### Code Location
-The difficulty system is defined in `/scripts/main_menu.gd`:
+The difficulty system is defined in `/scripts/ui/main_menu.gd`:
 
 ```gdscript
 const DIFFICULTIES: Array[Dictionary] = [

@@ -1,0 +1,50 @@
+[gd_scene load_steps=3 format=3 uid="uid://leaderboard_scene"]
+
+[ext_resource type="Script" path="res://scripts/ui/leaderboard.gd" id="1"]
+[ext_resource type="Theme" path="res://themes/ui_theme.tres" id="2"]
+
+[node name="Leaderboard" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource("2")
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.973, 0.941, 0.902, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 32
+
+[node name="CenterContainer" type="CenterContainer" parent="MarginContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="MarginContainer/CenterContainer"]
+custom_minimum_size = Vector2(720, 0)
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="MarginContainer/CenterContainer/Content"]
+text = "Leaderboard"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(0.145, 0.125, 0.105, 1)
+
+[node name="Message" type="Label" parent="MarginContainer/CenterContainer/Content"]
+text = "High scores will live here soon."
+horizontal_alignment = 1
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 18
+
+[node name="BackButton" type="Button" parent="MarginContainer/CenterContainer/Content"]
+text = "← Back to Menu"
+custom_minimum_size = Vector2(200, 48)
+size_flags_horizontal = 4
