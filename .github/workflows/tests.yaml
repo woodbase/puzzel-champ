@@ -19,7 +19,9 @@ jobs:
       - name: Install gdUnit4
         run: |
            wget https://github.com/godot-gdunit-labs/gdUnit4/archive/refs/tags/v6.1.1.zip
-           unzip gdUnit4.zip -d addons/gdUnit4
+           unzip v6.1.1.zip
+           rm -rf addons/gdUnit4
+           mv gdUnit4-6.1.1 addons/gdUnit4
 
       - name: Run Tests
         run: |

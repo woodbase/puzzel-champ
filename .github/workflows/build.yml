@@ -42,6 +42,7 @@ jobs:
       - name: Windows Build
         run: |
           cd $PROJECT_PATH
+          sed -i 's/enabled=PackedStringArray("gdUnit4")/enabled=PackedStringArray()/' project.godot
           godot --headless --verbose --export-release "Windows Desktop" \
             builds/windows/$EXPORT_NAME.exe
 
@@ -77,6 +78,7 @@ jobs:
       - name: Linux Build
         run: |
           cd $PROJECT_PATH
+          sed -i 's/enabled=PackedStringArray("gdUnit4")/enabled=PackedStringArray()/' project.godot
           godot --headless --verbose --export-release "Linux/X11" \
             builds/linux/$EXPORT_NAME.x86_64
 
@@ -136,6 +138,7 @@ jobs:
       - name: Android Build
         run: |
           cd $PROJECT_PATH
+          sed -i 's/enabled=PackedStringArray("gdUnit4")/enabled=PackedStringArray()/' project.godot
           godot --headless --verbose --export-debug "Android" \
             builds/android/$EXPORT_NAME.apk
 
