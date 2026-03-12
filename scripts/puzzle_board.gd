@@ -315,9 +315,12 @@ func _process(delta: float) -> void:
 
 
 ## Draws a highlight rectangle at the target position of the dragged piece when
-## it is within HIGHLIGHT_DISTANCE of that target.
+## it is within HIGHLIGHT_DISTANCE of that target and the piece orientation is correct.
 func _draw() -> void:
 	if _dragged_piece == null or not GameState.feedback_visual or not GameState.snap_to_board or _piece_size == Vector2.ZERO:
+		return
+	# Only show the highlight when the piece is in the correct orientation.
+	if GameState.allow_rotation and _dragged_piece.rotation_steps != 0:
 		return
 	var target_local: Vector2 = _dragged_piece.correct_position
 	var target_global: Vector2 = to_global(target_local)
