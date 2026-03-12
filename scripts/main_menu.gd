@@ -30,13 +30,17 @@ const DEFAULT_IMAGE_PATHS: Array[String] = [
 const USER_GALLERY_DIR := "user://gallery/"
 
 # ─── Colour constants ─────────────────────────────────────────────────────────
-const BG_COLOR       := Color(0.10, 0.12, 0.17)
-const PANEL_COLOR    := Color(0.15, 0.17, 0.22)
-const ITEM_COLOR     := Color(0.20, 0.22, 0.30)
-const ACCENT_COLOR   := Color(0.55, 0.35, 0.90)
-const BTN_COLOR      := Color(0.28, 0.18, 0.52)
-const TEXT_COLOR     := Color(0.88, 0.82, 0.98)
-const SUBTEXT_COLOR  := Color(0.58, 0.55, 0.68)
+const BG_GRADIENT_TOP    := Color(0.99, 0.93, 0.86)
+const BG_GRADIENT_BOTTOM := Color(0.96, 0.83, 0.93)
+const BG_HALO_COLOR      := Color(1.00, 0.88, 0.78, 0.55)
+const BG_TINT            := Color(1.00, 1.00, 1.00, 0.12)
+const PANEL_COLOR        := Color(1.00, 1.00, 1.00, 0.90)
+const PANEL_BORDER_COLOR := Color(1.00, 1.00, 1.00, 0.45)
+const ITEM_COLOR         := Color(1.00, 1.00, 1.00, 0.72)
+const ACCENT_COLOR       := Color(0.99, 0.46, 0.35)
+const BTN_COLOR          := Color(0.99, 0.64, 0.54)
+const TEXT_COLOR         := Color(0.18, 0.13, 0.24)
+const SUBTEXT_COLOR      := Color(0.40, 0.36, 0.48)
 
 ## Side length (px) of each square gallery thumbnail.
 const THUMBNAIL_SIZE := 96
@@ -248,11 +252,60 @@ func _limit_image_size(img: Image) -> void:
 # ─── UI construction ─────────────────────────────────────────────────────────
 
 func _build_ui() -> void:
-	# Full-screen background.
-	var bg := ColorRect.new()
-	bg.color = BG_COLOR
+	# Full-screen background with warm gradient and a soft halo.
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([BG_GRADIENT_TOP, BG_GRADIENT_BOTTOM])
+	var grad_tex := GradientTexture2D.new()
+	grad_tex.gradient = grad
+	grad_tex.width = 1920
+
+	var bg := TextureRect.new()
+	bg.texture = grad_tex
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
+
+	var halo_grad := Gradient.new()
+	halo_grad.colors = PackedColorArray([
+		BG_HALO_COLOR,
+		Color(BG_HALO_COLOR.r, BG_HALO_COLOR.g, BG_HALO_COLOR.b, 0.0)
+	])
+	var halo_tex := GradientTexture2D.new()
+	halo_tex.gradient = halo_grad
+	halo_tex.fill = GradientTexture2D.FILL_RADIAL
+	halo_tex.width = UIScale.px(960)
+	halo_tex.height = UIScale.px(960)
+
+	var halo := TextureRect.new()
+	halo.texture = halo_tex
+	halo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	halo.anchor_left = 0.0
+	halo.anchor_top = 0.0
+	halo.anchor_right = 0.0
+	halo.anchor_bottom = 0.0
+	halo.offset_left = UIScale.px(-80)
+	halo.offset_top = UIScale.px(-120)
+	halo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(halo)
+
+	var halo2 := TextureRect.new()
+	halo2.texture = halo_tex
+	halo2.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	halo2.anchor_left = 1.0
+	halo2.anchor_top = 1.0
+	halo2.anchor_right = 1.0
+	halo2.anchor_bottom = 1.0
+	halo2.offset_left = UIScale.px(-540)
+	halo2.offset_top = UIScale.px(-420)
+	halo2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(halo2)
+
+	var bg_tint := ColorRect.new()
+	bg_tint.color = BG_TINT
+	bg_tint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bg_tint)
 
 	# Outer margin – stored so it can be updated when the layout changes.
 	_outer_margin = MarginContainer.new()
@@ -270,7 +323,7 @@ func _build_ui() -> void:
 	root_vbox.add_child(_build_title_section())
 
 	var sep := HSeparator.new()
-	sep.add_theme_color_override("color", Color(0.28, 0.28, 0.40))
+	sep.add_theme_color_override("color", Color(0.96, 0.76, 0.68))
 	root_vbox.add_child(sep)
 
 	# Choose a side-by-side (landscape) or stacked (portrait) layout.
@@ -280,7 +333,7 @@ func _build_ui() -> void:
 		content_row = VBoxContainer.new()
 	else:
 		content_row = HBoxContainer.new()
-	content_row.add_theme_constant_override("separation", UIScale.px(20))
+	content_row.add_theme_constant_override("separation", UIScale.px(24))
 	content_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_vbox.add_child(content_row)
 
@@ -293,7 +346,28 @@ func _build_ui() -> void:
 
 func _build_title_section() -> Control:
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	var badge := PanelContainer.new()
+	var badge_sb := StyleBoxFlat.new()
+	badge_sb.bg_color = Color(1.00, 0.97, 0.93, 0.75)
+	_set_corner_radius(badge_sb, 14)
+	badge_sb.border_color = ACCENT_COLOR
+	badge_sb.border_width_left = 1
+	badge_sb.border_width_top = 1
+	badge_sb.border_width_right = 1
+	badge_sb.border_width_bottom = 1
+	badge.add_theme_stylebox_override("panel", badge_sb)
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	badge.custom_minimum_size = Vector2(UIScale.px(210), 0)
+	var badge_lbl := Label.new()
+	badge_lbl.text = "Cozy puzzles, welcoming vibes"
+	badge_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge_lbl.add_theme_font_size_override("font_size", UIScale.font_size(14))
+	badge_lbl.add_theme_color_override("font_color", ACCENT_COLOR.darkened(0.05))
+	badge.add_child(badge_lbl)
+	vbox.add_child(badge)
 
 	var portrait := UIScale.is_portrait()
 
@@ -305,7 +379,7 @@ func _build_title_section() -> Control:
 	vbox.add_child(_title_lbl)
 
 	_subtitle_lbl = Label.new()
-	_subtitle_lbl.text = "Pick an image from the gallery or upload your own, then start your puzzle!"
+	_subtitle_lbl.text = "Choose a comfy scene, set your style, and start relaxing."
 	_subtitle_lbl.add_theme_font_size_override("font_size", UIScale.font_size(16))
 	_subtitle_lbl.add_theme_color_override("font_color", SUBTEXT_COLOR)
 	_subtitle_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -332,6 +406,13 @@ func _build_gallery_panel(portrait_layout: bool = false) -> Control:
 	hdr.add_theme_font_size_override("font_size", 20)
 	hdr.add_theme_color_override("font_color", TEXT_COLOR)
 	vbox.add_child(hdr)
+
+	var hdr_sub := Label.new()
+	hdr_sub.text = "Pick a cozy scene from the gallery or upload a favorite photo."
+	hdr_sub.add_theme_font_size_override("font_size", UIScale.font_size(14))
+	hdr_sub.add_theme_color_override("font_color", SUBTEXT_COLOR)
+	hdr_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vbox.add_child(hdr_sub)
 
 	# Scrollable thumbnail grid.
 	var scroll := ScrollContainer.new()
@@ -451,8 +532,15 @@ func _build_settings_panel() -> Control:
 	preview_panel.custom_minimum_size = Vector2(0, 170)
 	preview_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var prev_style := StyleBoxFlat.new()
-	prev_style.bg_color = Color(0.08, 0.09, 0.13)
-	_set_corner_radius(prev_style, 8)
+	prev_style.bg_color = Color(1.00, 0.99, 0.96, 0.92)
+	_set_corner_radius(prev_style, 12)
+	prev_style.border_width_left = 1
+	prev_style.border_width_right = 1
+	prev_style.border_width_top = 1
+	prev_style.border_width_bottom = 1
+	prev_style.border_color = PANEL_BORDER_COLOR
+	prev_style.shadow_size = 8
+	prev_style.shadow_color = Color(0, 0, 0, 0.08)
 	preview_panel.add_theme_stylebox_override("panel", prev_style)
 	vbox.add_child(preview_panel)
 
@@ -566,17 +654,24 @@ func _make_panel() -> PanelContainer:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
 	style.bg_color = PANEL_COLOR
-	_set_corner_radius(style, 10)
+	_set_corner_radius(style, 16)
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_color = PANEL_BORDER_COLOR
+	style.shadow_size = 12
+	style.shadow_color = Color(0.00, 0.00, 0.00, 0.08)
 	panel.add_theme_stylebox_override("panel", style)
 	return panel
 
 
 func _make_inner_margin(parent: Control) -> MarginContainer:
 	var m := MarginContainer.new()
-	m.add_theme_constant_override("margin_left",   18)
-	m.add_theme_constant_override("margin_right",  18)
-	m.add_theme_constant_override("margin_top",    18)
-	m.add_theme_constant_override("margin_bottom", 18)
+	m.add_theme_constant_override("margin_left",   UIScale.px(20))
+	m.add_theme_constant_override("margin_right",  UIScale.px(20))
+	m.add_theme_constant_override("margin_top",    UIScale.px(20))
+	m.add_theme_constant_override("margin_bottom", UIScale.px(20))
 	parent.add_child(m)
 	return m
 
@@ -590,14 +685,16 @@ func _make_button(label_text: String) -> Button:
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	var padding_v := UIScale.px(14.0 if portrait else 10.0)
-	var padding_h := UIScale.px(16.0 if portrait else 14.0)
+	var padding_h := UIScale.px(18.0 if portrait else 16.0)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
 			"normal":  sb.bg_color = BTN_COLOR
-			"hover":   sb.bg_color = BTN_COLOR.lightened(0.20)
-			"pressed": sb.bg_color = BTN_COLOR.darkened(0.15)
-		_set_corner_radius(sb, 8)
+			"hover":   sb.bg_color = BTN_COLOR.lightened(0.15)
+			"pressed": sb.bg_color = BTN_COLOR.darkened(0.12)
+		_set_corner_radius(sb, 14)
+		sb.shadow_size = 6
+		sb.shadow_color = Color(0.00, 0.00, 0.00, 0.08)
 		sb.content_margin_left   = padding_h
 		sb.content_margin_right  = padding_h
 		sb.content_margin_top    = padding_v
@@ -612,7 +709,7 @@ func _make_button(label_text: String) -> Button:
 func _make_resume_button() -> Button:
 	var btn := Button.new()
 	btn.text = "▶  Resume Saved Puzzle"
-	btn.add_theme_color_override("font_color", Color(0.90, 1.00, 0.92))
+	btn.add_theme_color_override("font_color", Color(0.10, 0.21, 0.15))
 	var portrait := UIScale.is_portrait()
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
 	btn.custom_minimum_size = Vector2(0, 54)
@@ -623,10 +720,12 @@ func _make_resume_button() -> Button:
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
-			"normal":  sb.bg_color = Color(0.15, 0.42, 0.25)
-			"hover":   sb.bg_color = Color(0.20, 0.54, 0.32)
-			"pressed": sb.bg_color = Color(0.10, 0.30, 0.18)
-		_set_corner_radius(sb, 8)
+			"normal":  sb.bg_color = Color(0.72, 0.93, 0.79)
+			"hover":   sb.bg_color = Color(0.66, 0.90, 0.76)
+			"pressed": sb.bg_color = Color(0.58, 0.80, 0.67)
+		_set_corner_radius(sb, 14)
+		sb.shadow_size = 6
+		sb.shadow_color = Color(0.00, 0.00, 0.00, 0.08)
 		sb.content_margin_left   = padding_h
 		sb.content_margin_right  = padding_h
 		sb.content_margin_top    = padding_v
@@ -647,14 +746,21 @@ func _set_gallery_item_style(item: PanelContainer, selected: bool) -> void:
 	var sb := StyleBoxFlat.new()
 	_set_corner_radius(sb, 6)
 	if selected:
-		sb.bg_color    = Color(0.38, 0.24, 0.62)
-		sb.border_width_left   = 3
-		sb.border_width_right  = 3
-		sb.border_width_top    = 3
-		sb.border_width_bottom = 3
-		sb.border_color = Color(0.80, 0.65, 1.00)
+		sb.bg_color    = Color(1.00, 0.93, 0.87, 0.95)
+		sb.border_width_left   = 2
+		sb.border_width_right  = 2
+		sb.border_width_top    = 2
+		sb.border_width_bottom = 2
+		sb.border_color = ACCENT_COLOR
 	else:
 		sb.bg_color = ITEM_COLOR
+		sb.border_width_left   = 1
+		sb.border_width_right  = 1
+		sb.border_width_top    = 1
+		sb.border_width_bottom = 1
+		sb.border_color = PANEL_BORDER_COLOR
+	sb.shadow_size = 6
+	sb.shadow_color = Color(0.00, 0.00, 0.00, 0.05)
 	item.add_theme_stylebox_override("panel", sb)
 
 # ─── Selection state ──────────────────────────────────────────────────────────
@@ -701,7 +807,15 @@ func _apply_difficulty(index: int) -> void:
 			sb.border_width_right  = 2
 			sb.border_width_top    = 2
 			sb.border_width_bottom = 2
-			sb.border_color = Color(0.85, 0.75, 1.0)
+			sb.border_color = ACCENT_COLOR.lightened(0.25)
+		else:
+			sb.border_width_left   = 1
+			sb.border_width_right  = 1
+			sb.border_width_top    = 1
+			sb.border_width_bottom = 1
+			sb.border_color = PANEL_BORDER_COLOR
+		sb.shadow_size = 6
+		sb.shadow_color = Color(0.00, 0.00, 0.00, 0.06)
 		sb.content_margin_left   = 14
 		sb.content_margin_right  = 14
 		sb.content_margin_top    = 10
@@ -751,7 +865,15 @@ func _apply_shape(index: int) -> void:
 			sb.border_width_right  = 2
 			sb.border_width_top    = 2
 			sb.border_width_bottom = 2
-			sb.border_color = Color(0.85, 0.75, 1.0)
+			sb.border_color = ACCENT_COLOR.lightened(0.25)
+		else:
+			sb.border_width_left   = 1
+			sb.border_width_right  = 1
+			sb.border_width_top    = 1
+			sb.border_width_bottom = 1
+			sb.border_color = PANEL_BORDER_COLOR
+		sb.shadow_size = 6
+		sb.shadow_color = Color(0.00, 0.00, 0.00, 0.06)
 		sb.content_margin_left   = 14
 		sb.content_margin_right  = 14
 		sb.content_margin_top    = 10
@@ -966,13 +1088,15 @@ func _show_leaderboard() -> void:
 
 	var card := PanelContainer.new()
 	var ps := StyleBoxFlat.new()
-	ps.bg_color = Color(0.12, 0.10, 0.22, 0.98)
+	ps.bg_color = Color(1.00, 0.99, 0.96, 0.96)
 	_set_corner_radius(ps, 16)
-	ps.border_width_left   = 2
-	ps.border_width_right  = 2
-	ps.border_width_top    = 2
-	ps.border_width_bottom = 2
-	ps.border_color = Color(0.55, 0.35, 0.90)
+	ps.border_width_left   = 1
+	ps.border_width_right  = 1
+	ps.border_width_top    = 1
+	ps.border_width_bottom = 1
+	ps.border_color = ACCENT_COLOR
+	ps.shadow_size = 12
+	ps.shadow_color = Color(0.00, 0.00, 0.00, 0.08)
 	card.add_theme_stylebox_override("panel", ps)
 	card.custom_minimum_size = Vector2(UIScale.px(440), UIScale.px(340))
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1008,7 +1132,7 @@ func _show_leaderboard() -> void:
 	title_row.add_child(close_btn)
 
 	var sep := HSeparator.new()
-	sep.add_theme_color_override("color", Color(0.35, 0.28, 0.55))
+	sep.add_theme_color_override("color", Color(0.96, 0.76, 0.68))
 	vbox.add_child(sep)
 
 	# Scrollable scores area.
@@ -1035,7 +1159,7 @@ func _show_leaderboard() -> void:
 		var diff_hdr := Label.new()
 		diff_hdr.text = "%s  (%d × %d)" % [d["label"], d_cols, d_rows]
 		diff_hdr.add_theme_font_size_override("font_size", UIScale.font_size(16))
-		diff_hdr.add_theme_color_override("font_color", Color(0.75, 0.65, 0.95))
+		diff_hdr.add_theme_color_override("font_color", ACCENT_COLOR)
 		scores_vbox.add_child(diff_hdr)
 
 		for rank: int in range(entries.size()):
