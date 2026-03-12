@@ -1,0 +1,150 @@
+[gd_scene load_steps=3 format=3 uid="uid://sceneselect"]
+
+[ext_resource type="Theme" path="res://themes/ui_theme.tres" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/scene_select.gd" id="2"]
+[ext_resource type="Texture2D" path="res://docs/itchio/cover.png" id="3"]
+
+[node name="SceneSelect" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource("1")
+script = ExtResource("2")
+
+[node name="Background" type="TextureRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("3")
+expand_mode = 1
+stretch_mode = 6
+modulate = Color(1, 1, 1, 0.82)
+
+[node name="Overlay" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.06, 0.1, 0.72)
+
+[node name="SafeArea" type="SafeArea" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="MarginContainer" type="MarginContainer" parent="SafeArea"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 32
+
+[node name="MainLayout" type="HBoxContainer" parent="SafeArea/MarginContainer"]
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="ImageGallery" type="PanelContainer" parent="SafeArea/MarginContainer/MainLayout"]
+custom_minimum_size = Vector2(620, 0)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="GalleryContent" type="VBoxContainer" parent="SafeArea/MarginContainer/MainLayout/ImageGallery"]
+custom_minimum_size = Vector2(0, 480)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="SafeArea/MarginContainer/MainLayout/ImageGallery/GalleryContent"]
+text = "Scene Gallery"
+theme_override_font_sizes/font_size = 22
+
+[node name="SceneGrid" type="GridContainer" parent="SafeArea/MarginContainer/MainLayout/ImageGallery/GalleryContent"]
+columns = 3
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
+[node name="UploadImageButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/ImageGallery/GalleryContent"]
+text = "Upload Your Own Image"
+custom_minimum_size = Vector2(260, 50)
+size_flags_horizontal = 4
+
+[node name="PuzzleSettingsPanel" type="PanelContainer" parent="SafeArea/MarginContainer/MainLayout"]
+custom_minimum_size = Vector2(420, 0)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="SettingsContent" type="VBoxContainer" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel"]
+custom_minimum_size = Vector2(0, 520)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="SettingsTitle" type="Label" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+text = "Puzzle Setup"
+theme_override_font_sizes/font_size = 22
+
+[node name="PreviewPanel" type="PanelContainer" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+custom_minimum_size = Vector2(360, 220)
+size_flags_horizontal = 3
+
+[node name="PreviewImage" type="TextureRect" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/PreviewPanel"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+stretch_mode = 4
+mouse_filter = 2
+modulate = Color(1, 1, 1, 1)
+
+[node name="DifficultyLabel" type="Label" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+text = "Difficulty"
+theme_override_font_sizes/font_size = 18
+
+[node name="DifficultyButtons" type="HBoxContainer" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+theme_override_constants/separation = 10
+
+[node name="EasyButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/DifficultyButtons"]
+text = "Easy"
+size_flags_horizontal = 3
+
+[node name="MediumButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/DifficultyButtons"]
+text = "Medium"
+size_flags_horizontal = 3
+
+[node name="HardButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/DifficultyButtons"]
+text = "Hard"
+size_flags_horizontal = 3
+
+[node name="ExpertButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/DifficultyButtons"]
+text = "Expert"
+size_flags_horizontal = 3
+
+[node name="PieceStyleLabel" type="Label" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+text = "Piece Style"
+theme_override_font_sizes/font_size = 18
+
+[node name="PieceStyleButtons" type="HBoxContainer" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+theme_override_constants/separation = 10
+
+[node name="SquareButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/PieceStyleButtons"]
+text = "Square"
+size_flags_horizontal = 3
+
+[node name="JigsawButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent/PieceStyleButtons"]
+text = "Jigsaw"
+size_flags_horizontal = 3
+
+[node name="StartSpacer" type="Control" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+size_flags_vertical = 3
+
+[node name="StartPuzzleButton" type="Button" parent="SafeArea/MarginContainer/MainLayout/PuzzleSettingsPanel/SettingsContent"]
+custom_minimum_size = Vector2(320, 64)
+text = "START PUZZLE"
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 22
+
+[node name="UploadDialog" type="FileDialog" parent="."]
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.png,*.jpg,*.jpeg,*.webp ; Image Files")
