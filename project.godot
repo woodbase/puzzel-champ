@@ -1,21 +1,23 @@
 ; Engine configuration file.
 ; It's best edited using the editor UI and not directly,
-; since the parser isn't that forgiving.
-; Keep it organized!
 ; since the parameters that go here are not all obvious.
 ;
 ; Format:
-;   [section] ; section goes in []
+;   [section] ; section goes between []
 ;   param=value ; assign values to parameters
 
 config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="Puzzle Champ"
 config/description="A puzzle game with your own images"
 run/main_scene="res://scenes/splash/splash.tscn"
-config/features=PackedStringArray("4.3", "gl_compatibility")
+config/features=PackedStringArray("4.6")
 config/icon="res://gfx/icon.png"
 
 [autoload]
@@ -27,12 +29,6 @@ UIScale="*res://scripts/ui_scale.gd"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-window/size/resizable=true
-
-[rendering]
-
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
 
 [editor_plugins]
 
