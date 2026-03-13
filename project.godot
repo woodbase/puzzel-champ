@@ -16,9 +16,11 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Puzzle Champ"
 config/description="A puzzle game with your own images"
+config/version="0.0.5"
 run/main_scene="res://scenes/splash/splash.tscn"
 config/features=PackedStringArray("4.6")
-config/icon="res://gfx/icon.png"
+config/icon="uid://wcs54dexddux"
+<<<<<<<HEADconfig/icon="res://gfx/icon.png"
 
 [autoload]
 
