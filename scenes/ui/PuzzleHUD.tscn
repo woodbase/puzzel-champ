@@ -1,0 +1,238 @@
+[gd_scene load_steps=9 format=3 uid="uid://puzzle_hud"]
+
+[ext_resource type="PackedScene" uid="uid://icon_button" path="res://scenes/ui/components/IconButton.tscn" id="1"]
+[ext_resource type="PackedScene" uid="uid://puzzle_button" path="res://scenes/ui/components/PuzzleButton.tscn" id="2"]
+
+[sub_resource type="StyleBoxFlat" id="1_top"]
+bg_color = Color(0.10, 0.12, 0.18, 0.96)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_left = 18
+corner_radius_bottom_right = 18
+shadow_color = Color(0, 0, 0, 0.32)
+shadow_size = 12
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.78, 0.62, 1, 0.92)
+
+[sub_resource type="StyleBoxFlat" id="2_bottom"]
+bg_color = Color(0.12, 0.10, 0.22, 0.96)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_left = 18
+corner_radius_bottom_right = 18
+shadow_color = Color(0, 0, 0, 0.32)
+shadow_size = 12
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.96, 0.76, 0.32, 0.92)
+
+[sub_resource type="StyleBoxFlat" id="3_tray"]
+bg_color = Color(0.08, 0.12, 0.20, 0.95)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_left = 16
+corner_radius_bottom_right = 16
+shadow_color = Color(0, 0, 0, 0.26)
+shadow_size = 10
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.66, 0.82, 1, 0.9)
+
+[node name="HUD" type="CanvasLayer"]
+layer = 10
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SafeMargin" type="MarginContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+mouse_filter = 2
+
+[node name="Center" type="CenterContainer" parent="Root/SafeMargin"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="HUDLayout" type="VBoxContainer" parent="Root/SafeMargin/Center"]
+custom_minimum_size = Vector2(1100, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+theme_override_constants/separation = 10
+mouse_filter = 2
+
+[node name="TopBarPanel" type="PanelContainer" parent="Root/SafeMargin/Center/HUDLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("1_top")
+mouse_filter = 0
+
+[node name="TopBarMargin" type="MarginContainer" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+mouse_filter = 2
+
+[node name="TopBarContent" type="HBoxContainer" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 10
+mouse_filter = 2
+
+[node name="BackButton" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent" instance=ExtResource("1")]
+unique_name_in_owner = true
+text = "⟵"
+mouse_filter = 0
+
+[node name="TimerLabel" type="Label" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent"]
+unique_name_in_owner = true
+text = "00:00"
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.94, 0.92, 1, 1)
+vertical_alignment = 1
+mouse_filter = 2
+size_flags_horizontal = 3
+
+[node name="PiecesLabel" type="Label" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent"]
+unique_name_in_owner = true
+text = "Pieces: 0 / 0"
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.94, 0.92, 1, 1)
+vertical_alignment = 1
+mouse_filter = 2
+size_flags_horizontal = 3
+
+[node name="SaveSlotLabel" type="Label" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent"]
+unique_name_in_owner = true
+text = ""
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.62, 0.9, 0.7, 1)
+vertical_alignment = 1
+mouse_filter = 2
+size_flags_horizontal = 1
+
+[node name="TopSpacer" type="Control" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent"]
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="SaveButton" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent" instance=ExtResource("1")]
+unique_name_in_owner = true
+text = "💾"
+mouse_filter = 0
+
+[node name="PreviewButton" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent" instance=ExtResource("1")]
+unique_name_in_owner = true
+text = "👁"
+mouse_filter = 0
+
+[node name="PauseButton" parent="Root/SafeMargin/Center/HUDLayout/TopBarPanel/TopBarMargin/TopBarContent" instance=ExtResource("1")]
+unique_name_in_owner = true
+text = "⏸"
+mouse_filter = 0
+
+[node name="PlayAreaSpacer" type="Control" parent="Root/SafeMargin/Center/HUDLayout"]
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="PieceTrayPanel" type="PanelContainer" parent="Root/SafeMargin/Center/HUDLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 150)
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("3_tray")
+mouse_filter = 0
+
+[node name="TrayMargin" type="MarginContainer" parent="Root/SafeMargin/Center/HUDLayout/PieceTrayPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+mouse_filter = 2
+
+[node name="TrayScroll" type="ScrollContainer" parent="Root/SafeMargin/Center/HUDLayout/PieceTrayPanel/TrayMargin"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 3
+horizontal_scroll_mode = 2
+vertical_scroll_mode = 0
+mouse_filter = 0
+
+[node name="PieceTray" type="HBoxContainer" parent="Root/SafeMargin/Center/HUDLayout/PieceTrayPanel/TrayMargin/TrayScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 8
+mouse_filter = 0
+
+[node name="BottomBarPanel" type="PanelContainer" parent="Root/SafeMargin/Center/HUDLayout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 78)
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("2_bottom")
+mouse_filter = 0
+
+[node name="BottomMargin" type="MarginContainer" parent="Root/SafeMargin/Center/HUDLayout/BottomBarPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+mouse_filter = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="Root/SafeMargin/Center/HUDLayout/BottomBarPanel/BottomMargin"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 10
+mouse_filter = 2
+
+[node name="HintButton" parent="Root/SafeMargin/Center/HUDLayout/BottomBarPanel/BottomMargin/BottomBar" instance=ExtResource("2")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+text = "💡 Hint"
+mouse_filter = 0
+
+[node name="ShuffleButton" parent="Root/SafeMargin/Center/HUDLayout/BottomBarPanel/BottomMargin/BottomBar" instance=ExtResource("2")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+text = "🔀 Shuffle"
+mouse_filter = 0
+
+[node name="ZoomButton" parent="Root/SafeMargin/Center/HUDLayout/BottomBarPanel/BottomMargin/BottomBar" instance=ExtResource("2")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+text = "🔍 Zoom"
+mouse_filter = 0
+
+[node name="RotateButton" parent="Root/SafeMargin/Center/HUDLayout/BottomBarPanel/BottomMargin/BottomBar" instance=ExtResource("2")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 58)
+text = "⟳ Rotate"
+mouse_filter = 0

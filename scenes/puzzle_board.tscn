@@ -1,9 +1,9 @@
-[gd_scene load_steps=2 format=3 uid="uid://dvdao2bu05o5y"]
+[gd_scene load_steps=3 format=3 uid="uid://dvdao2bu05o5y"]
 
 [ext_resource type="Script" path="res://scripts/puzzle_board.gd" id="1_board"]
+[ext_resource type="PackedScene" uid="uid://puzzle_hud" path="res://scenes/ui/PuzzleHUD.tscn" id="2_hud"]
 
 [node name="PuzzleBoard" type="Node2D"]
 script = ExtResource("1_board")
 
-[node name="HUD" type="CanvasLayer" parent="."]
-layer = 10
+[node name="HUD" parent="." instance=ExtResource("2_hud")]

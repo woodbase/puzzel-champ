@@ -141,9 +141,9 @@ var _preview_toggle_btn: Button = null
 ## Difficulty buttons inside the in-game menu panel.
 var _menu_diff_btns: Array[Button] = []
 
-## ColorRect that forms the HUD top bar; stored to allow height updates on
+## Control that forms the HUD top bar; stored to allow height updates on
 ## orientation / scale change.
-var _hud_top_bar: ColorRect = null
+var _hud_top_bar: Control = null
 
 ## HBoxContainer that holds the HUD buttons and counter; stored to allow
 ## height and layout updates on orientation / scale change.
@@ -152,6 +152,25 @@ var _hud_hbox: HBoxContainer = null
 ## All buttons created inside the HUD bar, stored so their styles can be
 ## refreshed when the layout changes.
 var _hud_buttons: Array[Button] = []
+
+## Piece tray container showing thumbnails for remaining pieces.
+var _piece_tray: HBoxContainer = null
+
+## Entries in the piece tray, aligned to the _pieces array.
+var _piece_tray_entries: Array = []
+
+## Reserved height for the bottom HUD (piece tray + bottom bar).
+var _hud_bottom_h: float = 180.0
+
+## HUD action buttons.
+var _hint_button: Button = null
+var _shuffle_button: Button = null
+var _zoom_button: Button = null
+var _rotate_button: Button = null
+var _preview_button: Button = null
+var _save_button: Button = null
+var _back_button: Button = null
+var _pause_button: Button = null
 
 ## Sorting-box data list.  Each element is a Dictionary with keys:
 ##   "name"   – display label (String)
@@ -347,80 +366,82 @@ func _is_portrait() -> bool:
 
 
 func _build_hud() -> void:
-	# Semi-transparent top bar – reference stored for layout updates.
-	_hud_top_bar = ColorRect.new()
-	_hud_top_bar.color = Color(0.10, 0.12, 0.17, 0.92)
-	_hud_top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hud_top_bar.offset_bottom = HUD_H
-	_hud.add_child(_hud_top_bar)
+	_hud_top_bar = _hud.get_node_or_null("%TopBarPanel") as Control
+	_hud_hbox = _hud.get_node_or_null("%TopBarContent") as HBoxContainer
+	_piece_tray = _hud.get_node_or_null("%PieceTray") as HBoxContainer
+	_hint_button = _hud.get_node_or_null("%HintButton") as Button
+	_shuffle_button = _hud.get_node_or_null("%ShuffleButton") as Button
+	_zoom_button = _hud.get_node_or_null("%ZoomButton") as Button
+	_rotate_button = _hud.get_node_or_null("%RotateButton") as Button
+	_preview_button = _hud.get_node_or_null("%PreviewButton") as Button
+	_save_button = _hud.get_node_or_null("%SaveButton") as Button
+	_back_button = _hud.get_node_or_null("%BackButton") as Button
+	_pause_button = _hud.get_node_or_null("%PauseButton") as Button
 
-	# Button / counter row – reference stored for layout updates.
-	_hud_hbox = HBoxContainer.new()
-	_hud_hbox.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hud_hbox.offset_left   = 12
-	_hud_hbox.offset_right  = -12
-	_hud_hbox.offset_bottom = HUD_H
-	_hud_hbox.add_theme_constant_override("separation", 8)
-	_hud.add_child(_hud_hbox)
+	_timer_label = _hud.get_node_or_null("%TimerLabel") as Label
+	_counter_label = _hud.get_node_or_null("%PiecesLabel") as Label
+	_save_slot_label = _hud.get_node_or_null("%SaveSlotLabel") as Label
+
+	HUD_H = UIScale.px(70.0 if UIScale.is_portrait() else 60.0)
+	_hud_bottom_h = UIScale.px(230.0 if UIScale.is_portrait() else 200.0)
+
+	if _hud_top_bar != null:
+		_hud_top_bar.custom_minimum_size = Vector2(_hud_top_bar.custom_minimum_size.x, HUD_H)
+	if _hud_hbox != null:
+		_hud_hbox.custom_minimum_size = Vector2(_hud_hbox.custom_minimum_size.x, HUD_H)
+
+	if _counter_label != null:
+		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(20))
+		_counter_label.custom_minimum_size = Vector2(0, HUD_H)
+	if _timer_label != null:
+		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(20))
+		_timer_label.custom_minimum_size = Vector2(0, HUD_H)
+	if _save_slot_label != null:
+		_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(14))
+		_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
 
 	_hud_buttons.clear()
 
-	var back_btn := _make_hud_button("Menu")
-	back_btn.pressed.connect(_on_back_pressed)
-	_hud_hbox.add_child(back_btn)
-	_hud_buttons.append(back_btn)
+	if _back_button != null:
+		_back_button.pressed.connect(_on_back_pressed)
+		_hud_buttons.append(_back_button)
 
-	var restart_btn := _make_hud_button("Restart")
-	restart_btn.pressed.connect(_on_restart_puzzle)
-	restart_btn.tooltip_text = "Restart this puzzle"
-	_hud_hbox.add_child(restart_btn)
-	_hud_buttons.append(restart_btn)
+	if _save_button != null:
+		_save_button.pressed.connect(_on_save_pressed)
+		_save_button.tooltip_text = "Save progress"
+		_hud_buttons.append(_save_button)
 
-	var save_btn := _make_hud_button("Save")
-	save_btn.pressed.connect(_on_save_pressed)
-	save_btn.tooltip_text = "Save progress to Slot 1"
-	_hud_hbox.add_child(save_btn)
-	_hud_buttons.append(save_btn)
+	if _preview_button != null:
+		_preview_button.pressed.connect(_toggle_preview)
+		_preview_button.tooltip_text = "Show / hide preview"
+		_preview_toggle_btn = _preview_button
+		_preview_toggle_btn.text = "👁 On"
+		_hud_buttons.append(_preview_button)
 
-	_preview_toggle_btn = _make_hud_button("Preview: On")
-	_preview_toggle_btn.pressed.connect(_toggle_preview)
-	_preview_toggle_btn.tooltip_text = "Show / hide puzzle reference image"
-	_hud_hbox.add_child(_preview_toggle_btn)
-	_hud_buttons.append(_preview_toggle_btn)
+	if _pause_button != null:
+		_pause_button.pressed.connect(_toggle_settings_panel)
+		_pause_button.tooltip_text = "Pause / menu"
+		_hud_buttons.append(_pause_button)
 
-	var settings_btn := _make_hud_button("☰ Menu")
-	settings_btn.pressed.connect(_toggle_settings_panel)
-	settings_btn.tooltip_text = "Game menu"
-	_hud_hbox.add_child(settings_btn)
-	_hud_buttons.append(settings_btn)
+	if _hint_button != null:
+		_hint_button.pressed.connect(_on_hint_pressed)
+		_hud_buttons.append(_hint_button)
 
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hud_hbox.add_child(spacer)
+	if _shuffle_button != null:
+		_shuffle_button.pressed.connect(_on_shuffle_pressed)
+		_hud_buttons.append(_shuffle_button)
 
-	_save_slot_label = Label.new()
-	_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(14))
-	_save_slot_label.add_theme_color_override("font_color", Color(0.60, 0.85, 0.65))
-	_save_slot_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
-	_save_slot_label.visible = false
-	_hud_hbox.add_child(_save_slot_label)
+	if _zoom_button != null:
+		_zoom_button.pressed.connect(_on_zoom_pressed)
+		_hud_buttons.append(_zoom_button)
 
-	_timer_label = Label.new()
-	_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
-	_timer_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_timer_label.custom_minimum_size = Vector2(0, HUD_H)
-	_hud_hbox.add_child(_timer_label)
+	if _rotate_button != null:
+		_rotate_button.pressed.connect(_on_rotate_pressed)
+		_hud_buttons.append(_rotate_button)
 
-	_counter_label = Label.new()
-	_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
-	_counter_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	_counter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_counter_label.custom_minimum_size = Vector2(0, HUD_H)
-	_hud_hbox.add_child(_counter_label)
-
+	_update_rotate_button_label()
 	_update_counter()
+	_update_save_slot_label(GameState.has_save)
 	_build_settings_panel()
 	_build_complete_overlay()
 	_build_preview_panel()
@@ -459,16 +480,17 @@ func _make_hud_button(label_text: String) -> Button:
 ## Updates the HUD bar height and button styles to match the current layout.
 ## Called when UIScale emits layout_changed (orientation flip or window resize).
 func _on_layout_changed() -> void:
-	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+	HUD_H = UIScale.px(70.0 if UIScale.is_portrait() else 60.0)
+	_hud_bottom_h = UIScale.px(230.0 if UIScale.is_portrait() else 200.0)
 
 	if _hud_top_bar != null:
-		_hud_top_bar.offset_bottom = HUD_H
+		_hud_top_bar.custom_minimum_size = Vector2(_hud_top_bar.custom_minimum_size.x, HUD_H)
 
 	if _hud_hbox != null:
-		_hud_hbox.offset_bottom = HUD_H
+		_hud_hbox.custom_minimum_size = Vector2(_hud_hbox.custom_minimum_size.x, HUD_H)
 
 	if _counter_label != null:
-		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
+		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(20))
 		_counter_label.custom_minimum_size = Vector2(0, HUD_H)
 
 	if _save_slot_label != null:
@@ -476,22 +498,13 @@ func _on_layout_changed() -> void:
 		_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
 
 	if _timer_label != null:
-		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
+		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(20))
 		_timer_label.custom_minimum_size = Vector2(0, HUD_H)
 
 	var portrait := UIScale.is_portrait()
-	var padding_v := UIScale.px(12.0 if portrait else 8.0)
-	var padding_h := UIScale.px(16.0 if portrait else 12.0)
 	for btn in _hud_buttons:
 		btn.add_theme_font_size_override(
 			"font_size", UIScale.font_size(18 if portrait else 16))
-		for state in ["normal", "hover", "pressed"]:
-			var sb: StyleBoxFlat = btn.get_theme_stylebox(state) as StyleBoxFlat
-			if sb != null:
-				sb.content_margin_left   = padding_h
-				sb.content_margin_right  = padding_h
-				sb.content_margin_top    = padding_v
-				sb.content_margin_bottom = padding_v
 
 	# Reposition the settings panel below the (possibly resized) HUD bar.
 	if _settings_panel != null:
@@ -524,7 +537,7 @@ func _on_layout_changed() -> void:
 func _settings_panel_height() -> int:
 	var vp_h := int(get_viewport().get_visible_rect().size.y)
 	# 460 px is the natural content height; cap to fit on small screens.
-	return mini(460, vp_h - int(HUD_H) - 8)
+	return mini(460, vp_h - int(HUD_H) - int(_hud_bottom_h) - 8)
 
 
 # ─── Workspace zoom and pan ───────────────────────────────────────────────────
@@ -538,6 +551,8 @@ func _reset_camera() -> void:
 	_panning = false
 	_camera.zoom = Vector2.ONE
 	_camera.position = get_viewport_rect().size * 0.5
+	if _zoom_button != null:
+		_zoom_button.text = "🔍 Zoom"
 
 
 ## Zooms the workspace by zoom_factor, keeping the world point under
@@ -1043,7 +1058,55 @@ func _toggle_preview() -> void:
 	if _zoom_overlay != null and not _preview_panel.visible:
 		_zoom_overlay.visible = false
 	if _preview_toggle_btn != null:
-		_preview_toggle_btn.text = "Preview: On" if _preview_panel.visible else "Preview: Off"
+		_preview_toggle_btn.text = "👁 On" if _preview_panel.visible else "👁 Off"
+
+
+func _on_hint_pressed() -> void:
+	_show_hint_for_open_piece()
+
+
+func _show_hint_for_open_piece() -> void:
+	for piece in _pieces:
+		if is_instance_valid(piece) and not piece.is_locked:
+			_flash_hint_for_piece(piece)
+			return
+
+
+func _flash_hint_for_piece(piece) -> void:
+	if _piece_size == Vector2.ZERO:
+		return
+	var overlay := ColorRect.new()
+	overlay.color = Color(1.0, 0.95, 0.40, 0.32)
+	var screen_pos := to_global(piece.correct_position)
+	overlay.position = screen_pos - _piece_size * 0.5
+	overlay.size = _piece_size
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud.add_child(overlay)
+
+	var tween := create_tween()
+	tween.tween_property(overlay, "modulate:a", 0.0, 0.75).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(overlay.queue_free)
+
+
+func _on_shuffle_pressed() -> void:
+	_on_new_puzzle()
+
+
+func _on_zoom_pressed() -> void:
+	if _camera == null:
+		return
+	if _zoom_level > 1.02:
+		_reset_camera()
+	else:
+		_zoom_at_point(1.3, get_viewport_rect().size * 0.5)
+	if _zoom_button != null:
+		_zoom_button.text = "🔍 Zoom" if _zoom_level <= 1.02 else "🔎 Reset"
+
+
+func _on_rotate_pressed() -> void:
+	GameState.allow_rotation = not GameState.allow_rotation
+	_update_rotate_button_label()
+	_on_new_puzzle()
 
 
 ## Applies the current GameState.volume to all AudioStreamPlayers.
@@ -1059,6 +1122,83 @@ func _apply_volume() -> void:
 		_complete_player.volume_db = COMPLETE_BASE_DB + offset
 	if _music_player != null:
 		_music_player.volume_db = MUSIC_BASE_DB + offset
+
+
+func _update_rotate_button_label() -> void:
+	if _rotate_button != null:
+		_rotate_button.text = "⟳ Rotate %s" % ("On" if GameState.allow_rotation else "Off")
+
+
+func _rebuild_piece_tray() -> void:
+	if _piece_tray == null:
+		return
+	for child in _piece_tray.get_children():
+		child.queue_free()
+	_piece_tray_entries.clear()
+
+	for piece in _pieces:
+		if not is_instance_valid(piece):
+			_piece_tray_entries.append(null)
+			continue
+		var btn := Button.new()
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		btn.custom_minimum_size = Vector2(86, 78)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.18, 0.20, 0.32, 0.95)
+		sb.corner_radius_top_left = 12
+		sb.corner_radius_top_right = 12
+		sb.corner_radius_bottom_left = 12
+		sb.corner_radius_bottom_right = 12
+		sb.border_width_left = 2
+		sb.border_width_top = 2
+		sb.border_width_right = 2
+		sb.border_width_bottom = 2
+		sb.border_color = Color(0.66, 0.82, 1, 0.9)
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb.duplicate())
+		btn.add_theme_stylebox_override("pressed", sb.duplicate())
+
+		var tex := (piece.get_node("Sprite2D") as Sprite2D).texture
+		if tex != null:
+			var tex_rect := TextureRect.new()
+			tex_rect.texture = tex
+			tex_rect.anchor_right = 1.0
+			tex_rect.anchor_bottom = 1.0
+			tex_rect.grow_horizontal = Control.GROW_DIRECTION_BOTH
+			tex_rect.grow_vertical = Control.GROW_DIRECTION_BOTH
+			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			btn.add_child(tex_rect)
+
+		var piece_ref = piece
+		btn.pressed.connect(func() -> void: _focus_piece(piece_ref))
+		_piece_tray.add_child(btn)
+		_piece_tray_entries.append(btn)
+
+	_update_piece_tray_state()
+
+
+func _update_piece_tray_state() -> void:
+	if _piece_tray_entries.is_empty():
+		return
+	for i in range(min(_piece_tray_entries.size(), _pieces.size())):
+		var entry: Control = _piece_tray_entries[i]
+		var piece = _pieces[i]
+		if entry == null or not is_instance_valid(entry):
+			continue
+		if not is_instance_valid(piece):
+			entry.modulate = Color(1, 1, 1, 0.4)
+		else:
+			entry.modulate = Color(1, 1, 1, 0.35) if piece.is_locked else Color(1, 1, 1, 1)
+
+
+func _focus_piece(piece) -> void:
+	if piece == null or not is_instance_valid(piece) or piece.is_locked:
+		return
+	var vp := get_viewport_rect().size
+	piece.position = Vector2(vp.x * 0.5, HUD_H + (vp.y - HUD_H - _hud_bottom_h) * 0.5)
+	piece.z_index = piece.DRAG_Z_INDEX
 
 
 func _build_complete_overlay() -> void:
@@ -1213,7 +1353,7 @@ func _build_puzzle() -> void:
 	# screen_piece_h) ensures the assembled puzzle always shows the complete image
 	# without stretching or squishing.
 	var avail_w: float = viewport_size.x * 0.90
-	var avail_h: float = (viewport_size.y - HUD_H) * 0.90
+	var avail_h: float = (viewport_size.y - HUD_H - _hud_bottom_h) * 0.90
 
 	var image := source_texture.get_image()
 	if image == null:
@@ -1285,7 +1425,7 @@ func _build_puzzle() -> void:
 	# Centre the puzzle grid on the available canvas area.
 	_puzzle_origin = Vector2(
 		(viewport_size.x - display_w) * 0.5,
-		HUD_H + ((viewport_size.y - HUD_H) - display_h) * 0.5
+		HUD_H + ((viewport_size.y - HUD_H - _hud_bottom_h) - display_h) * 0.5
 	)
 
 	# Uniform scale factor from image-space to screen-space.
@@ -1357,7 +1497,7 @@ func _build_puzzle() -> void:
 		var spawn_half_h := _piece_size.y * 0.5
 		var spawn_pos := Vector2(
 			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
-			randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_half_h)
+			randf_range(HUD_H + spawn_half_h, viewport_size.y - _hud_bottom_h - spawn_half_h)
 		)
 		piece.position = spawn_pos
 		_pieces_initial_positions.append(spawn_pos)
@@ -1367,6 +1507,7 @@ func _build_puzzle() -> void:
 
 		_pieces.append(piece)
 
+	_rebuild_piece_tray()
 	_animate_board_entry()
 
 
@@ -1460,6 +1601,7 @@ func _format_time(seconds: float) -> String:
 func on_piece_placed() -> void:
 	_placed_pieces += 1
 	_update_counter()
+	_update_piece_tray_state()
 	if GameState.feedback_audio and _snap_player != null:
 		_snap_player.play()
 	if _placed_pieces >= _total_pieces and _total_pieces > 0:
@@ -1933,7 +2075,7 @@ func _on_back_pressed() -> void:
 	_timer_running = false
 	if _music_player != null:
 		_music_player.stop()
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/MainMenu.tscn")
 
 
 # ─── Save / Load ──────────────────────────────────────────────────────────────
@@ -2037,6 +2179,7 @@ func _apply_saved_state() -> void:
 			_placed_pieces       += 1
 
 	_update_counter()
+	_update_piece_tray_state()
 	_update_save_slot_label(true)
 
 
@@ -2140,6 +2283,8 @@ func _on_restart_puzzle() -> void:
 		else:
 			push_warning("PuzzleBoard: _pieces_initial_positions out of sync at index %d" % i)
 
+	_update_piece_tray_state()
+
 
 ## Clears all pieces and rebuilds the puzzle with the same image.
 func _on_new_puzzle() -> void:
@@ -2171,6 +2316,10 @@ func _on_new_puzzle() -> void:
 		piece.queue_free()
 	_pieces.clear()
 	_pieces_initial_positions.clear()
+	_piece_tray_entries.clear()
+	if _piece_tray != null:
+		for child in _piece_tray.get_children():
+			child.queue_free()
 
 	_placed_pieces = 0
 	_total_pieces  = 0

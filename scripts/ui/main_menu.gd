@@ -7,6 +7,7 @@ extends Control
 @onready var _leaderboard_button: Button = %LeaderboardButton
 @onready var _settings_button: Button = %SettingsButton
 @onready var _resume_button: Button = %ResumeButton
+@onready var _logo_panel: Control = %LogoPanel
 
 # ─── Lifecycle ───────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ func _ready() -> void:
 
 	_refresh_resume_button(GameState.has_save)
 	_apply_button_styles()
+	_float_logo()
 
 	for btn: Button in [_play_button, _gallery_button, _leaderboard_button, _settings_button, _resume_button]:
 		_add_button_feedback(btn)
@@ -195,3 +197,13 @@ func _show_error(text: String) -> void:
 	dialog.canceled.connect(dialog.queue_free)
 	dialog.close_requested.connect(dialog.queue_free)
 
+
+func _float_logo() -> void:
+	if _logo_panel == null:
+		return
+	var base_pos := _logo_panel.position
+	var tween := create_tween().set_loops()
+	tween.tween_property(_logo_panel, "position", base_pos + Vector2(0, -6), 1.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_logo_panel, "position", base_pos, 1.6) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)

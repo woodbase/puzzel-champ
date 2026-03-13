@@ -1,6 +1,6 @@
 extends Control
 
-@export var next_scene : String = "res://scenes/main_menu.tscn"
+@export var next_scene : String = "res://scenes/ui/MainMenu.tscn"
 @export var splash_time : float = 2.5
 @export var fade_time : float = 1.0
 @export var portrait_texture : Texture2D

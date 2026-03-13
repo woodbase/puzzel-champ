@@ -11,7 +11,7 @@ const DEFAULT_IMAGE_PATHS: Array[String] = [
 const USER_GALLERY_DIR := "user://gallery/"
 const MAX_IMAGE_DIMENSION := 2048
 
-const SceneCardScene := preload("res://scenes/ui/scene_card.tscn")
+const SceneCardScene := preload("res://scenes/ui/components/SceneCard.tscn")
 
 const DIFFICULTIES: Array[Dictionary] = [
 	{"key": "easy", "label": "Easy", "cols": 3, "rows": 2, "color": Color(0.32, 0.74, 0.42)},
@@ -44,6 +44,7 @@ var _preview_tween: Tween = null
 @onready var _preview_image: TextureRect = %PreviewImage
 @onready var _start_button: Button = %StartPuzzleButton
 @onready var _back_button: Button = %BackButton
+@onready var _back_icon_button: Button = %BackIconButton
 
 @onready var _difficulty_buttons: Dictionary = {
 	"easy": %EasyButton,
@@ -63,6 +64,8 @@ func _ready() -> void:
 	_upload_dialog.file_selected.connect(_on_file_selected)
 	_start_button.pressed.connect(_on_start_puzzle_pressed)
 	_back_button.pressed.connect(_on_back_pressed)
+	if _back_icon_button != null:
+		_back_icon_button.pressed.connect(_on_back_pressed)
 	UIScale.layout_changed.connect(_apply_responsive_layout)
 
 	_init_difficulty_buttons()
@@ -78,6 +81,8 @@ func _ready() -> void:
 	_add_button_feedback(_upload_button)
 	_add_button_feedback(_start_button, true)
 	_add_button_feedback(_back_button)
+	if _back_icon_button != null:
+		_add_button_feedback(_back_icon_button)
 	for btn: Button in _difficulty_buttons.values():
 		_add_button_feedback(btn)
 	for btn2: Button in _piece_style_buttons.values():
@@ -226,7 +231,7 @@ func _find_difficulty_key(cols: int, rows: int) -> String:
 
 
 func _apply_responsive_layout() -> void:
-	var width := get_viewport_rect().size.x
+	var width := minf(get_viewport_rect().size.x, 1100.0)
 	_set_layout_vertical(width < 900.0)
 
 	var columns := 4
@@ -400,7 +405,7 @@ func _on_start_puzzle_pressed() -> void:
 
 
 func _on_back_pressed() -> void:
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/MainMenu.tscn")
 
 
 func _show_error(text: String) -> void:
@@ -549,4 +554,3 @@ func _add_button_feedback(btn: Button, brighten_on_hover: bool = false) -> void:
 func _create_feedback_tween(ctrl: Control, target: Vector2, duration: float) -> void:
 	var tween := create_tween()
 	tween.tween_property(ctrl, "scale", target, duration).set_trans(Tween.TRANS_SINE)
-
