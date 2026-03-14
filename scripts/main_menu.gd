@@ -17,6 +17,12 @@ const SHAPES: Array[Dictionary] = [
 	{"label": "Jigsaw", "key": "jigsaw"},
 ]
 
+# ─── UI icon assets ───────────────────────────────────────────────────────────
+const ICON_PLAY     := preload("res://gfx/ui/icons/icon_play.png")
+const ICON_TROPHY   := preload("res://gfx/ui/icons/icon_trophy.png")
+const ICON_SETTINGS := preload("res://gfx/ui/icons/icon_settings.png")
+const ICON_DELETE   := preload("res://gfx/ui/icons/icon_delete.png")
+
 # ─── Default puzzle images bundled with the game ─────────────────────────────
 const DEFAULT_IMAGE_PATHS: Array[String] = [
 	"res://gfx/puzzles/pexels-harun-tan-2311991-3980364.jpg",
@@ -419,18 +425,19 @@ func _build_gallery_item(index: int) -> PanelContainer:
 		container.add_child(overlay)
 
 		var del_btn := Button.new()
-		del_btn.text = "×"
+		del_btn.icon = ICON_DELETE
 		del_btn.anchor_left   = 1.0
 		del_btn.anchor_top    = 0.0
 		del_btn.anchor_right  = 1.0
 		del_btn.anchor_bottom = 0.0
-		del_btn.offset_left   = -22
+		del_btn.offset_left   = -24
 		del_btn.offset_top    = 2
 		del_btn.offset_right  = -2
-		del_btn.offset_bottom = 22
+		del_btn.offset_bottom = 24
 		del_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		del_btn.add_theme_font_size_override("font_size", 13)
-		del_btn.add_theme_color_override("font_color", Color.WHITE)
+		del_btn.add_theme_color_override("icon_normal_color", Color.WHITE)
+		del_btn.add_theme_color_override("icon_hover_color", Color.WHITE)
+		del_btn.add_theme_color_override("icon_pressed_color", Color.WHITE)
 		for state in ["normal", "hover", "pressed"]:
 			var sb := StyleBoxFlat.new()
 			match state:
@@ -591,13 +598,13 @@ func _build_settings_panel() -> Control:
 	_resume_btn.visible = GameState.has_save
 	vbox.add_child(_resume_btn)
 	# ── Leaderboard button ──
-	var lb_btn := _make_button("🏆 Leaderboard")
+	var lb_btn := _make_button("Leaderboard", ICON_TROPHY)
 	lb_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lb_btn.pressed.connect(_show_leaderboard)
 	vbox.add_child(lb_btn)
 
 	# ── Settings button ──
-	var settings_btn := _make_button("⚙ Settings")
+	var settings_btn := _make_button("Settings", ICON_SETTINGS)
 	settings_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	settings_btn.pressed.connect(_show_settings_overlay)
 	vbox.add_child(settings_btn)
@@ -633,9 +640,11 @@ func _make_inner_margin(parent: Control) -> MarginContainer:
 	return m
 
 
-func _make_button(label_text: String) -> Button:
+func _make_button(label_text: String, icon: Texture2D = null) -> Button:
 	var btn := Button.new()
 	btn.text = label_text
+	if icon:
+		btn.icon = icon
 	btn.add_theme_color_override("font_color", TEXT_COLOR)
 	var portrait := UIScale.is_portrait()
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
@@ -663,7 +672,8 @@ func _make_button(label_text: String) -> Button:
 ## differentiate it from the standard Start button.
 func _make_resume_button() -> Button:
 	var btn := Button.new()
-	btn.text = "▶  Resume Saved Puzzle"
+	btn.text = "Resume Saved Puzzle"
+	btn.icon = ICON_PLAY
 	btn.add_theme_color_override("font_color", Color(0.90, 1.00, 0.92))
 	var portrait := UIScale.is_portrait()
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
@@ -1149,13 +1159,13 @@ func _show_leaderboard() -> void:
 	vbox.add_child(title_row)
 
 	var title_lbl := Label.new()
-	title_lbl.text = "🏆  Leaderboard"
+	title_lbl.text = "Leaderboard"
 	title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(28))
 	title_lbl.add_theme_color_override("font_color", TEXT_COLOR)
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_lbl)
 
-	var close_btn := _make_button("✕ Close")
+	var close_btn := _make_button("Close")
 	close_btn.pressed.connect(func() -> void:
 		if is_instance_valid(overlay):
 			overlay.queue_free()
@@ -1289,13 +1299,13 @@ func _show_settings_overlay() -> void:
 	vbox.add_child(title_row)
 
 	var title_lbl := Label.new()
-	title_lbl.text = "⚙  Settings"
+	title_lbl.text = "Settings"
 	title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(28))
 	title_lbl.add_theme_color_override("font_color", TEXT_COLOR)
 	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(title_lbl)
 
-	var close_btn := _make_button("✕ Close")
+	var close_btn := _make_button("Close")
 	close_btn.pressed.connect(func() -> void:
 		if is_instance_valid(overlay):
 			overlay.queue_free()

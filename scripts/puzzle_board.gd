@@ -27,6 +27,12 @@ const PuzzleGlowEffect = preload("res://scripts/puzzle_glow_effect.gd")
 ## puzzle_board.gd stays in sync with main_menu.gd without duplicating data.
 const MainMenuScript = preload("res://scripts/main_menu.gd")
 
+# ─── UI icon assets ───────────────────────────────────────────────────────────
+const ICON_MENU     := preload("res://gfx/ui/icons/icon_menu.png")
+const ICON_SAVE     := preload("res://gfx/ui/icons/icon_save.png")
+const ICON_TROPHY   := preload("res://gfx/ui/icons/icon_trophy.png")
+const ICON_SETTINGS := preload("res://gfx/ui/icons/icon_settings.png")
+
 ## Height in pixels of the top HUD bar. Set dynamically based on
 ## orientation and screen scale so that portrait / mobile gets a taller bar
 ## with comfortably large touch targets.
@@ -221,7 +227,7 @@ const MUSIC_BASE_DB: float = -18.0
 ## Path to the single save-slot file (mirrors GameState.SAVE_PATH for convenience).
 const SAVE_PATH: String = "user://puzzle_save.json"
 
-## Small HUD label that shows the save-slot status ("💾 Slot 1" or nothing).
+## Small HUD label that shows the save-slot status ("Saved" or nothing).
 var _save_slot_label: Label = null
 
 ## Minimum linear volume passed to linear_to_db() to avoid log(0) errors.
@@ -385,7 +391,8 @@ func _build_hud() -> void:
 	_hud_hbox.add_child(_preview_toggle_btn)
 	_hud_buttons.append(_preview_toggle_btn)
 
-	var settings_btn := _make_hud_button("☰ Menu")
+	var settings_btn := _make_hud_button("Menu")
+	settings_btn.icon = ICON_MENU
 	settings_btn.pressed.connect(_toggle_settings_panel)
 	settings_btn.tooltip_text = "Game menu"
 	_hud_hbox.add_child(settings_btn)
@@ -2048,11 +2055,11 @@ func _clear_save() -> void:
 
 
 ## Updates the save-slot indicator label in the HUD.
-## *saved* = true shows "💾 Saved", false hides the label.
+## *saved* = true shows "Saved", false hides the label.
 func _update_save_slot_label(saved: bool) -> void:
 	if _save_slot_label == null:
 		return
-	_save_slot_label.text = "💾 Saved"
+	_save_slot_label.text = "Saved"
 	_save_slot_label.visible = saved
 
 
