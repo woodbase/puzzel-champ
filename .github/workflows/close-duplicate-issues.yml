@@ -2,11 +2,6 @@ name: Close Duplicate Issues
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/close-duplicate-issues.yml'
 
 permissions:
   issues: write
