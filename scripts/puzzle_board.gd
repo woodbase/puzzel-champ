@@ -188,6 +188,18 @@ var _box_hover_popup_grid: GridContainer = null
 ## always fit the newly-rotated screen.
 var _last_portrait: bool = false
 
+## Bottom panel containing controls, reference image, and sorting boxes.
+var _bottom_panel: Control = null
+
+## Toggle button to show/hide the bottom panel.
+var _bottom_panel_toggle_btn: Button = null
+
+## Whether the bottom panel is currently expanded.
+var _bottom_panel_expanded: bool = true
+
+## Height of the bottom panel when expanded.
+const BOTTOM_PANEL_HEIGHT: float = 200.0
+
 ## Camera2D that controls the puzzle workspace zoom and pan.
 var _camera: Camera2D = null
 
@@ -346,7 +358,7 @@ func _is_portrait() -> bool:
 func _build_hud() -> void:
 	# Semi-transparent top bar – reference stored for layout updates.
 	_hud_top_bar = ColorRect.new()
-	_hud_top_bar.color = Color(0.10, 0.12, 0.17, 0.92)
+	_hud_top_bar.color = Color(0.10, 0.12, 0.17, 0.95)
 	_hud_top_bar.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	_hud_top_bar.offset_bottom = HUD_H
 	_hud.add_child(_hud_top_bar)
@@ -354,74 +366,68 @@ func _build_hud() -> void:
 	# Button / counter row – reference stored for layout updates.
 	_hud_hbox = HBoxContainer.new()
 	_hud_hbox.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hud_hbox.offset_left   = 12
-	_hud_hbox.offset_right  = -12
+	_hud_hbox.offset_left   = 8
+	_hud_hbox.offset_right  = -8
 	_hud_hbox.offset_bottom = HUD_H
-	_hud_hbox.add_theme_constant_override("separation", 8)
+	_hud_hbox.add_theme_constant_override("separation", 12)
 	_hud.add_child(_hud_hbox)
 
 	_hud_buttons.clear()
 
-	var back_btn := _make_hud_button("Menu")
+	# Left side: Back button
+	var back_btn := _make_hud_button("← Back")
 	back_btn.pressed.connect(_on_back_pressed)
 	_hud_hbox.add_child(back_btn)
 	_hud_buttons.append(back_btn)
 
-	var restart_btn := _make_hud_button("Restart")
-	restart_btn.pressed.connect(_on_restart_puzzle)
-	restart_btn.tooltip_text = "Restart this puzzle"
-	_hud_hbox.add_child(restart_btn)
-	_hud_buttons.append(restart_btn)
+	# Center: Title and info
+	var center_vbox := VBoxContainer.new()
+	center_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_vbox.add_theme_constant_override("separation", 0)
+	_hud_hbox.add_child(center_vbox)
 
-	var save_btn := _make_hud_button("Save")
-	save_btn.pressed.connect(_on_save_pressed)
-	save_btn.tooltip_text = "Save progress to Slot 1"
-	_hud_hbox.add_child(save_btn)
-	_hud_buttons.append(save_btn)
+	var title_label := Label.new()
+	title_label.text = "Puzzle Challenge"
+	title_label.add_theme_font_size_override("font_size", UIScale.font_size(16))
+	title_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	center_vbox.add_child(title_label)
 
-	_preview_toggle_btn = _make_hud_button("Preview: On")
-	_preview_toggle_btn.pressed.connect(_toggle_preview)
-	_preview_toggle_btn.tooltip_text = "Show / hide puzzle reference image"
-	_hud_hbox.add_child(_preview_toggle_btn)
-	_hud_buttons.append(_preview_toggle_btn)
+	var info_hbox := HBoxContainer.new()
+	info_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	info_hbox.add_theme_constant_override("separation", 16)
+	center_vbox.add_child(info_hbox)
 
-	var settings_btn := _make_hud_button("☰ Menu")
+	_timer_label = Label.new()
+	_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(13))
+	_timer_label.add_theme_color_override("font_color", Color(0.75, 0.70, 0.85))
+	_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	info_hbox.add_child(_timer_label)
+
+	_counter_label = Label.new()
+	_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(13))
+	_counter_label.add_theme_color_override("font_color", Color(0.75, 0.70, 0.85))
+	_counter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	info_hbox.add_child(_counter_label)
+
+	# Right side: Menu button
+	var settings_btn := _make_hud_button("☰")
 	settings_btn.pressed.connect(_toggle_settings_panel)
 	settings_btn.tooltip_text = "Game menu"
+	settings_btn.custom_minimum_size = Vector2(HUD_H - 8, 0)
 	_hud_hbox.add_child(settings_btn)
 	_hud_buttons.append(settings_btn)
 
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hud_hbox.add_child(spacer)
-
 	_save_slot_label = Label.new()
-	_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(14))
+	_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
 	_save_slot_label.add_theme_color_override("font_color", Color(0.60, 0.85, 0.65))
-	_save_slot_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
 	_save_slot_label.visible = false
-	_hud_hbox.add_child(_save_slot_label)
-
-	_timer_label = Label.new()
-	_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
-	_timer_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_timer_label.custom_minimum_size = Vector2(0, HUD_H)
-	_hud_hbox.add_child(_timer_label)
-
-	_counter_label = Label.new()
-	_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
-	_counter_label.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	_counter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_counter_label.custom_minimum_size = Vector2(0, HUD_H)
-	_hud_hbox.add_child(_counter_label)
 
 	_update_counter()
 	_build_settings_panel()
 	_build_complete_overlay()
-	_build_preview_panel()
-	_build_sorting_boxes_panel()
+	_build_bottom_panel()
 
 
 func _make_hud_button(label_text: String) -> Button:
@@ -465,16 +471,13 @@ func _on_layout_changed() -> void:
 		_hud_hbox.offset_bottom = HUD_H
 
 	if _counter_label != null:
-		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
-		_counter_label.custom_minimum_size = Vector2(0, HUD_H)
+		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(13))
 
 	if _save_slot_label != null:
-		_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(14))
-		_save_slot_label.custom_minimum_size = Vector2(0, HUD_H)
+		_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
 
 	if _timer_label != null:
-		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(18))
-		_timer_label.custom_minimum_size = Vector2(0, HUD_H)
+		_timer_label.add_theme_font_size_override("font_size", UIScale.font_size(13))
 
 	var portrait := UIScale.is_portrait()
 	var padding_v := UIScale.px(12.0 if portrait else 8.0)
@@ -495,17 +498,11 @@ func _on_layout_changed() -> void:
 		_settings_panel.offset_top    = HUD_H + 4
 		_settings_panel.offset_bottom = HUD_H + 4 + _settings_panel_height()
 
-	# Reposition the reference panel below the (possibly resized) HUD bar.
-	# The top offset depends on HUD_H which changes with orientation/scale.
-	if _preview_panel != null:
-		_preview_panel.offset_top    = HUD_H + REFERENCE_PANEL_MARGIN
-		_preview_panel.offset_bottom = HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H
-
-	# Reposition the sorting-box panel directly below the reference panel.
-	if _box_panel != null:
-		var box_top := HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H + BOX_PANEL_TOP_GAP
-		_box_panel.offset_top    = box_top
-		_box_panel.offset_bottom = box_top + _sorting_boxes_panel_height()
+	# Reposition the bottom panel at the bottom of the screen.
+	if _bottom_panel != null:
+		var panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT)
+		_bottom_panel.offset_top    = -panel_h
+		_bottom_panel.offset_bottom = 0
 
 	# Rebuild the puzzle when the device orientation flips (portrait ↔ landscape)
 	# so that all piece positions and the grid layout fit the new screen dimensions.
@@ -866,77 +863,6 @@ func _make_menu_small_button(label_text: String) -> Button:
 	return btn
 
 
-## Builds the reference image panel anchored to the top-left corner (below the HUD).
-## The panel is visible by default; clicking it opens a zoomed view.
-## Toggled with the "Preview" HUD button.
-func _build_preview_panel() -> void:
-	var panel := PanelContainer.new()
-	var ps := StyleBoxFlat.new()
-	ps.bg_color = Color(0.10, 0.09, 0.18, 0.92)
-	ps.corner_radius_top_left     = 8
-	ps.corner_radius_top_right    = 8
-	ps.corner_radius_bottom_left  = 8
-	ps.corner_radius_bottom_right = 8
-	ps.border_width_left   = 1
-	ps.border_width_right  = 1
-	ps.border_width_top    = 1
-	ps.border_width_bottom = 1
-	ps.border_color = Color(0.45, 0.28, 0.78)
-	panel.add_theme_stylebox_override("panel", ps)
-
-	# Anchor to top-left corner, positioned below the HUD bar.
-	panel.anchor_left   = 0.0
-	panel.anchor_right  = 0.0
-	panel.anchor_top    = 0.0
-	panel.anchor_bottom = 0.0
-	panel.offset_left   = REFERENCE_PANEL_MARGIN
-	panel.offset_right  = REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_W
-	panel.offset_top    = HUD_H + REFERENCE_PANEL_MARGIN
-	panel.offset_bottom = HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H
-	panel.visible = true
-	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_hud.add_child(panel)
-
-	var inner := MarginContainer.new()
-	inner.add_theme_constant_override("margin_left",   4)
-	inner.add_theme_constant_override("margin_right",  4)
-	inner.add_theme_constant_override("margin_top",    4)
-	inner.add_theme_constant_override("margin_bottom", 4)
-	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(inner)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 2)
-	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	inner.add_child(vbox)
-
-	var hdr := Label.new()
-	hdr.text = "Reference (click to zoom)"
-	hdr.add_theme_font_size_override("font_size", 11)
-	hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
-	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(hdr)
-
-	var tex_rect := TextureRect.new()
-	tex_rect.texture      = source_texture
-	tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
-	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tex_rect.size_flags_vertical   = Control.SIZE_EXPAND_FILL
-	tex_rect.custom_minimum_size   = Vector2(REFERENCE_PANEL_W - 12.0, REFERENCE_PANEL_H - 24.0)
-	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vbox.add_child(tex_rect)
-
-	# Clicking the panel opens the zoom overlay.
-	panel.gui_input.connect(_on_reference_panel_input)
-
-	_preview_panel = panel
-
-	# Build the zoom overlay (hidden until the panel is clicked).
-	_build_zoom_overlay()
-
-
 ## Builds a fullscreen zoom overlay containing a large centred view of the
 ## reference image.  Hidden by default; shown when the reference panel is clicked
 ## and dismissed by clicking the backdrop.
@@ -1056,6 +982,206 @@ func _apply_volume() -> void:
 		_complete_player.volume_db = COMPLETE_BASE_DB + offset
 	if _music_player != null:
 		_music_player.volume_db = MUSIC_BASE_DB + offset
+
+
+## Builds a bottom panel containing puzzle controls, reference image, and sorting boxes.
+## This panel can be toggled to maximize puzzle board space.
+func _build_bottom_panel() -> void:
+	var panel := PanelContainer.new()
+	var ps := StyleBoxFlat.new()
+	ps.bg_color = Color(0.10, 0.09, 0.18, 0.96)
+	ps.corner_radius_top_left     = 16
+	ps.corner_radius_top_right    = 16
+	ps.border_width_left   = 2
+	ps.border_width_right  = 2
+	ps.border_width_top    = 2
+	ps.border_color = Color(0.45, 0.28, 0.78)
+	panel.add_theme_stylebox_override("panel", ps)
+
+	# Anchor to bottom of screen
+	panel.anchor_left   = 0.0
+	panel.anchor_right  = 1.0
+	panel.anchor_top    = 1.0
+	panel.anchor_bottom = 1.0
+	var panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT)
+	panel.offset_top    = -panel_h
+	panel.offset_bottom = 0
+	_hud.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left",   12)
+	margin.add_theme_constant_override("margin_right",  12)
+	margin.add_theme_constant_override("margin_top",    12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	panel.add_child(margin)
+
+	var main_hbox := HBoxContainer.new()
+	main_hbox.add_theme_constant_override("separation", 16)
+	margin.add_child(main_hbox)
+
+	# Left section: Action buttons
+	var left_vbox := VBoxContainer.new()
+	left_vbox.add_theme_constant_override("separation", 8)
+	left_vbox.custom_minimum_size = Vector2(UIScale.px(140), 0)
+	main_hbox.add_child(left_vbox)
+
+	var actions_label := Label.new()
+	actions_label.text = "Actions"
+	actions_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
+	actions_label.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
+	left_vbox.add_child(actions_label)
+
+	var restart_btn := _make_bottom_button("Restart")
+	restart_btn.pressed.connect(_on_restart_puzzle)
+	restart_btn.tooltip_text = "Restart this puzzle"
+	left_vbox.add_child(restart_btn)
+
+	var save_btn := _make_bottom_button("Save")
+	save_btn.pressed.connect(_on_save_pressed)
+	save_btn.tooltip_text = "Save progress"
+	left_vbox.add_child(save_btn)
+
+	_preview_toggle_btn = _make_bottom_button("Preview: On")
+	_preview_toggle_btn.pressed.connect(_toggle_preview)
+	_preview_toggle_btn.tooltip_text = "Show/hide reference"
+	left_vbox.add_child(_preview_toggle_btn)
+
+	# Center section: Reference image
+	var center_vbox := VBoxContainer.new()
+	center_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	center_vbox.add_theme_constant_override("separation", 4)
+	main_hbox.add_child(center_vbox)
+
+	var ref_label := Label.new()
+	ref_label.text = "Reference Image (tap to zoom)"
+	ref_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
+	ref_label.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
+	ref_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	center_vbox.add_child(ref_label)
+
+	# Reference image with click handler
+	var ref_panel := PanelContainer.new()
+	var ref_ps := StyleBoxFlat.new()
+	ref_ps.bg_color = Color(0.08, 0.07, 0.15, 0.8)
+	ref_ps.corner_radius_top_left     = 6
+	ref_ps.corner_radius_top_right    = 6
+	ref_ps.corner_radius_bottom_left  = 6
+	ref_ps.corner_radius_bottom_right = 6
+	ref_panel.add_theme_stylebox_override("panel", ref_ps)
+	ref_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ref_panel.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+	ref_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	ref_panel.gui_input.connect(_on_reference_panel_input)
+	center_vbox.add_child(ref_panel)
+
+	var ref_margin := MarginContainer.new()
+	ref_margin.add_theme_constant_override("margin_left",   4)
+	ref_margin.add_theme_constant_override("margin_right",  4)
+	ref_margin.add_theme_constant_override("margin_top",    4)
+	ref_margin.add_theme_constant_override("margin_bottom", 4)
+	ref_panel.add_child(ref_margin)
+
+	var tex_rect := TextureRect.new()
+	tex_rect.texture      = source_texture
+	tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
+	tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ref_margin.add_child(tex_rect)
+
+	_preview_panel = ref_panel
+
+	# Build the zoom overlay
+	_build_zoom_overlay()
+
+	# Right section: Sorting boxes
+	var right_vbox := VBoxContainer.new()
+	right_vbox.add_theme_constant_override("separation", 6)
+	right_vbox.custom_minimum_size = Vector2(UIScale.px(140), 0)
+	main_hbox.add_child(right_vbox)
+
+	var boxes_label := Label.new()
+	boxes_label.text = "Sort Boxes"
+	boxes_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
+	boxes_label.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
+	right_vbox.add_child(boxes_label)
+
+	# Sorting boxes scroll area
+	var boxes_scroll := ScrollContainer.new()
+	boxes_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	boxes_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	right_vbox.add_child(boxes_scroll)
+
+	_box_vbox = VBoxContainer.new()
+	_box_vbox.add_theme_constant_override("separation", 4)
+	_box_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	boxes_scroll.add_child(_box_vbox)
+
+	# Initialize sorting boxes
+	_sorting_boxes.clear()
+	for box_name: String in SORTING_BOX_DEFAULTS:
+		_sorting_boxes.append({"name": box_name, "pieces": [], "button": null})
+
+	for i in _sorting_boxes.size():
+		_append_box_button(i)
+
+	# Add custom box controls
+	var add_sep := HSeparator.new()
+	add_sep.add_theme_color_override("color", Color(0.35, 0.28, 0.50))
+	_box_vbox.add_child(add_sep)
+
+	var add_row := HBoxContainer.new()
+	add_row.add_theme_constant_override("separation", 4)
+	_box_vbox.add_child(add_row)
+
+	var name_edit := LineEdit.new()
+	name_edit.placeholder_text = "New box…"
+	name_edit.add_theme_font_size_override("font_size", UIScale.font_size(11))
+	name_edit.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	name_edit.custom_minimum_size = Vector2(0, UIScale.px(24))
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_row.add_child(name_edit)
+
+	var add_btn := _make_small_icon_button("+")
+	add_btn.tooltip_text = "Add custom sorting box"
+	add_btn.pressed.connect(func() -> void:
+		var n := name_edit.text.strip_edges()
+		if n.length() > 0:
+			_add_custom_box(n)
+			name_edit.text = ""
+	)
+	add_row.add_child(add_btn)
+
+	_bottom_panel = panel
+	_build_box_view_overlay()
+	_build_box_hover_popup()
+
+
+## Creates a button for the bottom panel with consistent styling.
+func _make_bottom_button(label_text: String) -> Button:
+	var btn := Button.new()
+	btn.text = label_text
+	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	btn.add_theme_font_size_override("font_size", UIScale.font_size(13))
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	for state in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		match state:
+			"normal":  sb.bg_color = Color(0.25, 0.16, 0.48)
+			"hover":   sb.bg_color = Color(0.36, 0.23, 0.62)
+			"pressed": sb.bg_color = Color(0.18, 0.11, 0.36)
+		sb.corner_radius_top_left     = 5
+		sb.corner_radius_top_right    = 5
+		sb.corner_radius_bottom_left  = 5
+		sb.corner_radius_bottom_right = 5
+		sb.content_margin_left   = 8
+		sb.content_margin_right  = 8
+		sb.content_margin_top    = 6
+		sb.content_margin_bottom = 6
+		btn.add_theme_stylebox_override(state, sb)
+
+	return btn
 
 
 func _build_complete_overlay() -> void:
@@ -2185,96 +2311,6 @@ func _on_new_puzzle() -> void:
 
 # ─── Sorting boxes ────────────────────────────────────────────────────────────
 
-## Builds the sorting-box panel anchored to the left side of the workspace,
-## directly below the reference image panel.  Predefined categories are shown
-## as buttons; an add-custom row lets the player create new categories.
-func _build_sorting_boxes_panel() -> void:
-	_sorting_boxes.clear()
-	for box_name: String in SORTING_BOX_DEFAULTS:
-		_sorting_boxes.append({"name": box_name, "pieces": [], "button": null})
-
-	var panel := PanelContainer.new()
-	var ps := StyleBoxFlat.new()
-	ps.bg_color                   = Color(0.10, 0.09, 0.18, 0.92)
-	ps.corner_radius_top_left     = 8
-	ps.corner_radius_top_right    = 8
-	ps.corner_radius_bottom_left  = 8
-	ps.corner_radius_bottom_right = 8
-	ps.border_width_left   = 1
-	ps.border_width_right  = 1
-	ps.border_width_top    = 1
-	ps.border_width_bottom = 1
-	ps.border_color = Color(0.45, 0.28, 0.78)
-	panel.add_theme_stylebox_override("panel", ps)
-	panel.anchor_left   = 0.0
-	panel.anchor_right  = 0.0
-	panel.anchor_top    = 0.0
-	panel.anchor_bottom = 0.0
-	panel.offset_left   = REFERENCE_PANEL_MARGIN
-	panel.offset_right  = REFERENCE_PANEL_MARGIN + BOX_PANEL_W
-	var box_top := HUD_H + REFERENCE_PANEL_MARGIN + REFERENCE_PANEL_H + BOX_PANEL_TOP_GAP
-	panel.offset_top    = box_top
-	panel.offset_bottom = box_top + _sorting_boxes_panel_height()
-	_hud.add_child(panel)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left",   6)
-	margin.add_theme_constant_override("margin_right",  6)
-	margin.add_theme_constant_override("margin_top",    6)
-	margin.add_theme_constant_override("margin_bottom", 6)
-	panel.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	margin.add_child(vbox)
-	_box_vbox = vbox
-
-	# ── Header ──
-	var hdr := Label.new()
-	hdr.text = "Sort Boxes"
-	hdr.add_theme_font_size_override("font_size", 11)
-	hdr.add_theme_color_override("font_color", Color(0.65, 0.60, 0.85))
-	hdr.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(hdr)
-
-	# ── Box buttons (one per predefined category) ──
-	for i in _sorting_boxes.size():
-		_append_box_button(i)
-
-	# ── Separator ──
-	var sep := HSeparator.new()
-	sep.add_theme_color_override("color", Color(0.35, 0.28, 0.50))
-	vbox.add_child(sep)
-
-	# ── Add-custom row: LineEdit + "+" button ──
-	var add_row := HBoxContainer.new()
-	add_row.add_theme_constant_override("separation", 4)
-	vbox.add_child(add_row)
-
-	var name_edit := LineEdit.new()
-	name_edit.placeholder_text = "New box…"
-	name_edit.add_theme_font_size_override("font_size", 11)
-	name_edit.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	name_edit.custom_minimum_size = Vector2(0, 24)
-	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_row.add_child(name_edit)
-
-	var add_btn := _make_small_icon_button("+")
-	add_btn.tooltip_text = "Add custom sorting box"
-	add_btn.pressed.connect(func() -> void:
-		var n := name_edit.text.strip_edges()
-		if n.length() > 0:
-			_add_custom_box(n)
-			name_edit.text = ""
-	)
-	add_row.add_child(add_btn)
-
-	_box_panel = panel
-	_build_box_view_overlay()
-	_build_box_hover_popup()
-
-
 ## Appends a styled button for the sorting box at box_idx to _box_vbox,
 ## inserting it before the separator so box buttons always stay above it.
 func _append_box_button(box_idx: int) -> void:
@@ -2341,26 +2377,6 @@ func _make_small_icon_button(label_text: String) -> Button:
 		sb.content_margin_bottom = 2
 		btn.add_theme_stylebox_override(state, sb)
 	return btn
-
-
-## Returns the pixel height the sorting-box panel should occupy.
-## Header (~18 px) + N buttons × BOX_BUTTON_H + (N-1) × 4 px separation
-## + separator (8 px) + gap (4 px) + add-row (28 px) + margins (12 px).
-func _sorting_boxes_panel_height() -> float:
-	var n := _sorting_boxes.size()
-	return 18.0 \
-		+ float(n) * BOX_BUTTON_H \
-		+ float(maxi(n - 1, 0)) * 4.0 \
-		+ 4.0 + 8.0 + 28.0 + 12.0
-
-
-## Recalculates and applies the correct height for the sorting-box panel
-## (called when boxes are added).
-func _update_box_panel_size() -> void:
-	if _box_panel == null:
-		return
-	var top: float = _box_panel.offset_top
-	_box_panel.offset_bottom = top + _sorting_boxes_panel_height()
 
 
 ## Builds the full-screen box-view overlay (hidden until a box is opened).
@@ -2754,7 +2770,6 @@ func _add_custom_box(box_name: String) -> void:
 	var new_idx := _sorting_boxes.size()
 	_sorting_boxes.append({"name": box_name, "pieces": [], "button": null})
 	_append_box_button(new_idx)
-	_update_box_panel_size()
 
 
 ## Returns all pieces from every sorting box to the table and clears box data.
