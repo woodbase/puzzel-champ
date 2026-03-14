@@ -152,8 +152,8 @@ func _end_drag() -> void:
 	var distance := global_position.distance_to(correct_global)
 	var rotation_correct: bool = (rotation_steps == 0) or not GameState.allow_rotation
 	if distance < snap_distance and rotation_correct:
-		if GameState.snap_to_board:
-			global_position = correct_global
+		# Always snap to exact position to prevent visible offsets.
+		global_position = correct_global
 		rotation_degrees = 0.0
 		is_locked = true
 		input_pickable = false
