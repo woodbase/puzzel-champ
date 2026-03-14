@@ -198,7 +198,8 @@ var _bottom_panel_toggle_btn: Button = null
 var _bottom_panel_expanded: bool = true
 
 ## Height of the bottom panel when expanded.
-const BOTTOM_PANEL_HEIGHT: float = 200.0
+const BOTTOM_PANEL_HEIGHT_PORTRAIT: float = 240.0
+const BOTTOM_PANEL_HEIGHT_LANDSCAPE: float = 180.0
 
 ## Camera2D that controls the puzzle workspace zoom and pan.
 var _camera: Camera2D = null
@@ -355,6 +356,12 @@ func _is_portrait() -> bool:
 	return UIScale.is_portrait()
 
 
+## Returns the height of the bottom panel based on orientation.
+func _get_bottom_panel_height() -> float:
+	var base_height := BOTTOM_PANEL_HEIGHT_PORTRAIT if UIScale.is_portrait() else BOTTOM_PANEL_HEIGHT_LANDSCAPE
+	return UIScale.px(base_height)
+
+
 func _build_hud() -> void:
 	# Semi-transparent top bar – reference stored for layout updates.
 	_hud_top_bar = ColorRect.new()
@@ -500,7 +507,7 @@ func _on_layout_changed() -> void:
 
 	# Reposition the bottom panel at the bottom of the screen.
 	if _bottom_panel != null:
-		var panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT)
+		var panel_h := _get_bottom_panel_height()
 		_bottom_panel.offset_top    = -panel_h
 		_bottom_panel.offset_bottom = 0
 
@@ -994,8 +1001,10 @@ func _build_bottom_panel() -> void:
 	ps.corner_radius_top_right    = 16
 	ps.border_width_left   = 2
 	ps.border_width_right  = 2
-	ps.border_width_top    = 2
+	ps.border_width_top    = 3
 	ps.border_color = Color(0.45, 0.28, 0.78)
+	ps.shadow_size = 4
+	ps.shadow_color = Color(0.0, 0.0, 0.0, 0.3)
 	panel.add_theme_stylebox_override("panel", ps)
 
 	# Anchor to bottom of screen
@@ -1003,7 +1012,7 @@ func _build_bottom_panel() -> void:
 	panel.anchor_right  = 1.0
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
-	var panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT)
+	var panel_h := _get_bottom_panel_height()
 	panel.offset_top    = -panel_h
 	panel.offset_bottom = 0
 	_hud.add_child(panel)
@@ -1336,7 +1345,7 @@ func _build_puzzle() -> void:
 	# screen_piece_h) ensures the assembled puzzle always shows the complete image
 	# without stretching or squishing.
 	var avail_w: float = viewport_size.x * 0.90
-	var bottom_panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT) if _bottom_panel_expanded else 0.0
+	var bottom_panel_h := _get_bottom_panel_height() if _bottom_panel_expanded else 0.0
 	var avail_h: float = (viewport_size.y - HUD_H - bottom_panel_h) * 0.90
 
 	var image := source_texture.get_image()
@@ -1479,7 +1488,7 @@ func _build_puzzle() -> void:
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
 		var spawn_half_h := _piece_size.y * 0.5
-		var bottom_panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT) if _bottom_panel_expanded else 0.0
+		var bottom_panel_h := _get_bottom_panel_height() if _bottom_panel_expanded else 0.0
 		var spawn_pos := Vector2(
 			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
 			randf_range(HUD_H + spawn_half_h, viewport_size.y - bottom_panel_h - spawn_half_h)
