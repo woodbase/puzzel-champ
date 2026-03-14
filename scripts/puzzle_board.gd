@@ -2539,8 +2539,10 @@ func _show_box_hover_preview(box_idx: int, btn: Button) -> void:
 			"" if box_pieces.size() == 1 else "s",
 		]
 
-	# Rebuild thumbnail grid.
+	# Rebuild thumbnail grid.  Remove children from the tree first so stale
+	# thumbnails are not rendered alongside the incoming replacements.
 	for child in _box_hover_popup_grid.get_children():
+		_box_hover_popup_grid.remove_child(child)
 		child.queue_free()
 
 	if box_pieces.is_empty():
@@ -2627,8 +2629,10 @@ func _refresh_box_view() -> void:
 			"" if box_pieces.size() == 1 else "s",
 		]
 
-	# Clear existing thumbnails.
+	# Clear existing thumbnails.  Remove from tree immediately so they are not
+	# rendered alongside the incoming replacements before queue_free fires.
 	for child in _box_view_grid.get_children():
+		_box_view_grid.remove_child(child)
 		child.queue_free()
 
 	if box_pieces.is_empty():
@@ -2674,8 +2678,9 @@ func _refresh_box_view() -> void:
 			tex_rect.texture      = sprite.texture
 			tex_rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
 			tex_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			tex_rect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			tex_rect.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+			# Button is not a Container, so size_flags are ignored.  Use anchors
+			# instead so the TextureRect always fills the entire button area.
+			tex_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			thumb_btn.add_child(tex_rect)
 
@@ -2700,6 +2705,10 @@ func _add_piece_to_box(box_idx: int, piece) -> void:
 	var btn: Button = box.get("button")
 	if btn != null and is_instance_valid(btn):
 		btn.text = "%s [%d]" % [box.name, box_pieces.size()]
+
+	# Refresh the overlay so the new thumbnail appears immediately.
+	if _open_box_index == box_idx:
+		_refresh_box_view()
 
 
 ## Removes the piece at piece_idx from the box and returns it to the table.
