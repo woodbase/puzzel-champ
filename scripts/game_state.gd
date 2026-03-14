@@ -52,9 +52,10 @@ var feedback_audio: bool = true
 ## Whether haptic snap feedback (device vibration) is enabled.
 var feedback_haptic: bool = true
 
-## Whether pieces snap to their correct board position when dropped nearby.
-## When false, pieces lock at the dropped position without being pulled to the
-## grid, and the green pre-snap highlight is also hidden.
+## Whether to show visual snap hints (green highlight) when dragging pieces.
+## When false, the green pre-snap highlight is hidden, providing a cleaner
+## visual experience. Pieces always snap to their exact correct position when
+## placed within the snap threshold, regardless of this setting.
 var snap_to_board: bool = true
 
 ## Whether background music is enabled during gameplay.
