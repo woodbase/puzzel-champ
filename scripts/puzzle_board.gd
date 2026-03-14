@@ -2541,6 +2541,7 @@ func _show_box_hover_preview(box_idx: int, btn: Button) -> void:
 
 	# Rebuild thumbnail grid.
 	for child in _box_hover_popup_grid.get_children():
+		_box_hover_popup_grid.remove_child(child)
 		child.queue_free()
 
 	if box_pieces.is_empty():
@@ -2629,6 +2630,7 @@ func _refresh_box_view() -> void:
 
 	# Clear existing thumbnails.
 	for child in _box_view_grid.get_children():
+		_box_view_grid.remove_child(child)
 		child.queue_free()
 
 	if box_pieces.is_empty():
@@ -2700,6 +2702,10 @@ func _add_piece_to_box(box_idx: int, piece) -> void:
 	var btn: Button = box.get("button")
 	if btn != null and is_instance_valid(btn):
 		btn.text = "%s [%d]" % [box.name, box_pieces.size()]
+
+	# Refresh the overlay so the new thumbnail appears immediately.
+	if _open_box_index == box_idx:
+		_refresh_box_view()
 
 
 ## Removes the piece at piece_idx from the box and returns it to the table.
