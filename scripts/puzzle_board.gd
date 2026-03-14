@@ -1336,7 +1336,8 @@ func _build_puzzle() -> void:
 	# screen_piece_h) ensures the assembled puzzle always shows the complete image
 	# without stretching or squishing.
 	var avail_w: float = viewport_size.x * 0.90
-	var avail_h: float = (viewport_size.y - HUD_H) * 0.90
+	var bottom_panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT) if _bottom_panel_expanded else 0.0
+	var avail_h: float = (viewport_size.y - HUD_H - bottom_panel_h) * 0.90
 
 	var image := source_texture.get_image()
 	if image == null:
@@ -1408,7 +1409,7 @@ func _build_puzzle() -> void:
 	# Centre the puzzle grid on the available canvas area.
 	_puzzle_origin = Vector2(
 		(viewport_size.x - display_w) * 0.5,
-		HUD_H + ((viewport_size.y - HUD_H) - display_h) * 0.5
+		HUD_H + ((viewport_size.y - HUD_H - bottom_panel_h) - display_h) * 0.5
 	)
 
 	# Uniform scale factor from image-space to screen-space.
@@ -1478,9 +1479,10 @@ func _build_puzzle() -> void:
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
 		var spawn_half_h := _piece_size.y * 0.5
+		var bottom_panel_h := UIScale.px(BOTTOM_PANEL_HEIGHT) if _bottom_panel_expanded else 0.0
 		var spawn_pos := Vector2(
 			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
-			randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_half_h)
+			randf_range(HUD_H + spawn_half_h, viewport_size.y - bottom_panel_h - spawn_half_h)
 		)
 		piece.position = spawn_pos
 		_pieces_initial_positions.append(spawn_pos)
