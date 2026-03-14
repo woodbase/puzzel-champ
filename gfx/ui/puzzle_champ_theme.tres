@@ -1,0 +1,95 @@
+[gd_resource type="Theme" load_steps=23 format=3]
+
+[ext_resource type="Texture2D" path="res://gfx/ui/buttons/button_normal.png" id="1_btn_normal"]
+[ext_resource type="Texture2D" path="res://gfx/ui/buttons/button_hover.png" id="2_btn_hover"]
+[ext_resource type="Texture2D" path="res://gfx/ui/buttons/button_pressed.png" id="3_btn_pressed"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_menu.png" id="4_icon_menu"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_settings.png" id="5_icon_settings"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_play.png" id="6_icon_play"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_save.png" id="7_icon_save"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_delete.png" id="8_icon_delete"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_trophy.png" id="9_icon_trophy"]
+[ext_resource type="Texture2D" path="res://gfx/ui/icons/icon_back.png" id="10_icon_back"]
+[ext_resource type="Texture2D" path="res://gfx/ui/panels/panel_small.png" id="11_panel_small"]
+[ext_resource type="Texture2D" path="res://gfx/ui/panels/panel_medium.png" id="12_panel_medium"]
+[ext_resource type="Texture2D" path="res://gfx/ui/panels/panel_large.png" id="13_panel_large"]
+[ext_resource type="Texture2D" path="res://gfx/ui/panels/puzzle_box.png" id="14_puzzle_box"]
+[ext_resource type="Texture2D" path="res://gfx/ui/backgrounds/bg_main.png" id="15_bg_main"]
+[ext_resource type="Texture2D" path="res://gfx/ui/backgrounds/top_bar.png" id="16_top_bar"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bg"]
+bg_color = Color(0.10, 0.12, 0.17, 1)
+corner_radius_top_left = 0
+corner_radius_top_right = 0
+corner_radius_bottom_right = 0
+corner_radius_bottom_left = 0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.15, 0.17, 0.22, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.20, 0.22, 0.30, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
+bg_color = Color(0.28, 0.18, 0.52, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.38, 0.25, 0.65, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+bg_color = Color(0.20, 0.12, 0.40, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_puzzle_box"]
+bg_color = Color(0.20, 0.22, 0.30, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.55, 0.35, 0.90, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[resource]
+default_font_size = 16
+Button/colors/font_color = Color(0.88, 0.82, 0.98, 1)
+Button/colors/font_hover_color = Color(1, 1, 1, 1)
+Button/colors/font_pressed_color = Color(0.88, 0.82, 0.98, 1)
+Button/colors/font_disabled_color = Color(0.58, 0.55, 0.68, 1)
+Button/styles/normal = SubResource("StyleBoxFlat_button_normal")
+Button/styles/hover = SubResource("StyleBoxFlat_button_hover")
+Button/styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+Label/colors/font_color = Color(0.88, 0.82, 0.98, 1)
+Panel/styles/panel = SubResource("StyleBoxFlat_panel")
+PanelContainer/styles/panel = SubResource("StyleBoxFlat_panel")
