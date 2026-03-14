@@ -152,7 +152,9 @@ func _end_drag() -> void:
 	var distance := global_position.distance_to(correct_global)
 	var rotation_correct: bool = (rotation_steps == 0) or not GameState.allow_rotation
 	if distance < snap_distance and rotation_correct:
-		# Always snap to exact position to prevent visible offsets.
+		# Always snap to the exact target so no visible offset remains.
+		# GameState.snap_to_board controls only the pre-snap highlight drawn
+		# by PuzzleBoard._draw(); the final position is always corrected here.
 		global_position = correct_global
 		rotation_degrees = 0.0
 		is_locked = true
