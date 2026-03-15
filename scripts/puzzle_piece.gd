@@ -18,8 +18,23 @@ var is_locked: bool = false
 ## Whether this piece is currently being dragged.
 var _dragging: bool = false
 
+## Whether the player has pressed this piece but not yet exceeded the drag threshold.
+var _pending_drag: bool = false
+
+## The global position where the press started, used to measure drag distance.
+var _press_start: Vector2 = Vector2.ZERO
+
+## Minimum pixel movement required before a press is recognised as a drag.
+## Prevents accidental piece movement when tapping.
+const DRAG_THRESHOLD: float = 10.0
+
 ## Offset between the piece's position and the mouse when drag starts.
 var _drag_offset: Vector2 = Vector2.ZERO
+
+## Touch finger index currently driving this piece (-1 = mouse / not set).
+## Used to ensure only the originating finger controls the drag; other fingers
+## are ignored so multi-touch gestures don't cause erratic piece movement.
+var _drag_touch_index: int = -1
 
 ## z_index captured at drag start, restored on drop.
 var _original_z_index: int = 0
@@ -27,10 +42,22 @@ var _original_z_index: int = 0
 ## Elevated z_index while dragging so the piece renders on top.
 const DRAG_Z_INDEX: int = 10
 
+## Scale multiplier applied to the piece's sprite when it is picked up.
+## The same factor is reversed in cancel_drag() and _end_drag() to keep
+## the scale animations symmetric.
+const DRAG_SCALE_FACTOR: float = 1.08
+
 ## Distance threshold in pixels for snapping to the correct position.
 ## Set by PuzzleBoard after instantiation so the threshold scales with the
 ## actual piece size rather than using a fixed pixel value.
 var snap_distance: float = 40.0
+
+## Minimum squared-pixel movement required to update the piece position during
+## dragging.  Touch events on mobile can fire at 120 Hz or faster, producing
+## many identical or near-identical positions per visual frame.  Skipping
+## updates smaller than √MIN_DRAG_MOVE_SQ ≈ 0.5 px avoids redundant Area2D
+## transform recalculations and Sprite2D redraws without any perceptible lag.
+const MIN_DRAG_MOVE_SQ: float = 0.25
 
 ## Buffer seconds added after particle lifetime before the node is freed.
 const PARTICLE_CLEANUP_DELAY: float = 0.2
@@ -55,7 +82,10 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			_start_drag(get_global_mouse_position())
+			# Record press position; actual drag begins only after DRAG_THRESHOLD
+			# is exceeded, preventing accidental moves when tapping.
+			_press_start = get_global_mouse_position()
+			_pending_drag = true
 			# Consume the event so overlapping pieces don't also start dragging,
 			# which could cause the wrong piece to snap into an incorrect position.
 			get_viewport().set_input_as_handled()
@@ -70,32 +100,58 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		# double-invocation so only the first call takes effect.
 		var touch_event := event as InputEventScreenTouch
 		if touch_event.pressed:
-			_start_drag(touch_event.position)
+			# Record press position and which finger owns this drag so that
+			# subsequent drag events from other fingers are ignored.
+			_press_start = touch_event.position
+			_drag_touch_index = touch_event.index
+			_pending_drag = true
 			get_viewport().set_input_as_handled()
 
 
 func _input(event: InputEvent) -> void:
-	if not _dragging:
+	if not _dragging and not _pending_drag:
 		return
 
 	if event is InputEventMouseMotion:
-		_update_drag(get_global_mouse_position())
+		if _pending_drag and not _dragging:
+			# Start dragging once the cursor has moved far enough from the press
+			# position, so brief taps don't accidentally move pieces.
+			if get_global_mouse_position().distance_to(_press_start) >= DRAG_THRESHOLD:
+				_start_drag(get_global_mouse_position())
+		elif _dragging:
+			_update_drag(get_global_mouse_position())
 
 	elif event is InputEventScreenDrag:
-		# Keep the piece following the finger while it moves.
-		_update_drag((event as InputEventScreenDrag).position)
+		var screen_drag := event as InputEventScreenDrag
+		# Ignore drag events from a different finger than the one that started
+		# this drag.  This prevents erratic movement when a second finger touches
+		# the screen while a piece is already being dragged.
+		if _drag_touch_index != -1 and screen_drag.index != _drag_touch_index:
+			return
+		var drag_pos: Vector2 = screen_drag.position
+		if _pending_drag and not _dragging:
+			if drag_pos.distance_to(_press_start) >= DRAG_THRESHOLD:
+				_start_drag(drag_pos)
+		elif _dragging:
+			# Keep the piece following the finger while it moves.
+			_update_drag(drag_pos)
 
 	elif event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and not mouse_event.pressed:
-			_end_drag()
+			_pending_drag = false
+			if _dragging:
+				_end_drag()
 
 	elif event is InputEventScreenTouch:
 		# Finger lifted – end the drag.  _end_drag guards against the
 		# matching MouseButton release that emulate_mouse_from_touch also fires.
 		var touch_event := event as InputEventScreenTouch
-		if not touch_event.pressed:
-			_end_drag()
+		if not touch_event.pressed and touch_event.index == _drag_touch_index:
+			_drag_touch_index = -1
+			_pending_drag = false
+			if _dragging:
+				_end_drag()
 
 
 ## Begins dragging the piece.
@@ -114,15 +170,42 @@ func _start_drag(mouse_pos: Vector2) -> void:
 		if sprite != null:
 			var base_scale := sprite.scale
 			var tween := create_tween()
-			tween.tween_property(sprite, "scale", base_scale * 1.08, 0.12) \
+			tween.tween_property(sprite, "scale", base_scale * DRAG_SCALE_FACTOR, 0.12) \
 				.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 	piece_picked_up.emit()
 
 
 ## Moves the piece to follow the mouse.
+## Position is only written when the intended new position differs from the
+## current one by more than √MIN_DRAG_MOVE_SQ pixels, skipping the redundant
+## Area2D transform / AABB recalculation for sub-pixel touch events.
 func _update_drag(mouse_pos: Vector2) -> void:
-	global_position = mouse_pos + _drag_offset
+	var new_pos: Vector2 = mouse_pos + _drag_offset
+	if new_pos.distance_squared_to(global_position) >= MIN_DRAG_MOVE_SQ:
+		global_position = new_pos
+
+
+## Cancels an in-progress drag without attempting to snap the piece.
+## Called by PuzzleBoard when a multi-touch gesture begins so the piece
+## returns to its pre-drag z_index and the drag state is fully cleared.
+func cancel_drag() -> void:
+	if not _dragging and not _pending_drag:
+		return
+	_pending_drag = false
+	_drag_touch_index = -1
+	if _dragging:
+		_dragging = false
+		z_index = _original_z_index
+		# Restore the sprite scale that was animated up at drag start.
+		if GameState.feedback_visual:
+			var sprite := get_node_or_null("Sprite2D") as Sprite2D
+			if sprite != null:
+				var base_scale := sprite.scale / DRAG_SCALE_FACTOR
+				var tween := create_tween()
+				tween.tween_property(sprite, "scale", base_scale, 0.12) \
+					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		piece_released.emit()
 
 
 ## Rotates the piece 90° clockwise and increments the rotation_steps counter.
@@ -170,7 +253,7 @@ func _end_drag() -> void:
 		if GameState.feedback_visual:
 			var sprite := get_node_or_null("Sprite2D") as Sprite2D
 			if sprite != null:
-				var base_scale := sprite.scale / 1.08  # Undo the pickup scale.
+				var base_scale := sprite.scale / DRAG_SCALE_FACTOR  # Undo the pickup scale.
 				var tween := create_tween()
 				tween.tween_property(sprite, "scale", base_scale, 0.15) \
 					.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
@@ -231,22 +314,24 @@ func _spawn_lock_particles() -> void:
 
 
 ## Plays a brief scale-bounce and colour-flash animation on the sprite.
-## Enhanced with anticipation: squash → expand → elastic bounce back.
+## Squash → expand → elastic bounce back to natural 1× scale with a gold flash.
+## The sprite may be at drag scale (DRAG_SCALE_FACTOR) when this is called, so
+## all phases target absolute values relative to Vector2.ONE so the locked piece
+## always settles at its natural size.
 func _play_snap_animation() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite == null:
 		return
-	var base_scale: Vector2 = sprite.scale
 	var tween := create_tween()
 	# Phase 0: Quick anticipation squash (0.05 s) for snappier feel.
-	tween.tween_property(sprite, "scale", base_scale * 0.92, 0.05) \
+	tween.tween_property(sprite, "scale", Vector2(0.92, 0.92), 0.05) \
 		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	# Phase 1: Pop up and flash to gold (0.12 s), both properties in parallel.
-	tween.tween_property(sprite, "scale", base_scale * 1.25, 0.12) \
+	tween.tween_property(sprite, "scale", Vector2(1.25, 1.25), 0.12) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	tween.parallel().tween_property(sprite, "modulate", Color(1.6, 1.4, 0.2, 1.0), 0.12)
-	# Phase 2: Elastic spring back to normal (0.22 s) with stronger overshoot
+	# Phase 2: Elastic spring back to natural scale (0.22 s) with stronger overshoot
 	# for a more satisfying snap feel; colour fade runs in parallel.
-	tween.tween_property(sprite, "scale", base_scale, 0.22) \
+	tween.tween_property(sprite, "scale", Vector2.ONE, 0.22) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
 	tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.22)

@@ -144,6 +144,10 @@ var _zoom_overlay: Control = null
 ## Preview toggle button stored so its label can be updated.
 var _preview_toggle_btn: Button = null
 
+## TopBar quick-toggle button for the reference image overlay.
+## Highlighted when the overlay is visible.
+var _ref_quick_toggle_btn: Button = null
+
 ## Difficulty buttons inside the in-game menu panel.
 var _menu_diff_btns: Array[Button] = []
 
@@ -158,6 +162,10 @@ var _hud_hbox: HBoxContainer = null
 ## All buttons created inside the HUD bar, stored so their styles can be
 ## refreshed when the layout changes.
 var _hud_buttons: Array[Button] = []
+
+## The right-side "Menu" button in the HUD bar, stored separately so its
+## width component of custom_minimum_size can be updated when HUD_H changes.
+var _hud_menu_btn: Button = null
 
 ## Sorting-box data list.  Each element is a Dictionary with keys:
 ##   "name"   – display label (String)
@@ -183,6 +191,10 @@ var _box_view_title: Label = null
 ## Index of the sorting box currently displayed in the view overlay (-1 = none).
 var _open_box_index: int = -1
 
+## Index of the sorting box whose button is highlighted as a drop target while
+## the player is dragging a piece (-1 = none highlighted).
+var _drag_highlight_box_idx: int = -1
+
 ## Floating popup shown when hovering a sorting-box button to preview stored pieces.
 var _box_hover_popup: Control = null
 
@@ -197,10 +209,12 @@ var _last_portrait: bool = false
 ## Bottom panel containing controls, reference image, and sorting boxes.
 var _bottom_panel: Control = null
 
-## Toggle button to show/hide the bottom panel.
+## Toggle button in the top bar that hides/shows the bottom panel to expand
+## the puzzle workspace (mobile only).
 var _bottom_panel_toggle_btn: Button = null
 
-## Whether the bottom panel is currently expanded.
+## Whether the bottom panel is currently visible (workspace in normal mode).
+## When false the bottom panel is hidden and the full screen is puzzle workspace.
 var _bottom_panel_expanded: bool = true
 
 ## Height of the bottom panel when expanded.
@@ -231,6 +245,19 @@ var _pan_start_mouse: Vector2 = Vector2.ZERO
 ## Camera world position recorded when the current pan gesture started.
 var _pan_start_cam: Vector2 = Vector2.ZERO
 
+## Active touch points tracked for raw multi-touch gesture handling (Android).
+## Maps finger index → current screen position.
+var _touch_points: Dictionary = {}
+
+## True while a two-finger pinch/pan gesture is in progress on a touch screen.
+var _touch_gesture_active: bool = false
+
+## Finger distance at the start of the current gesture frame (updated each event).
+var _gesture_prev_dist: float = 0.0
+
+## Gesture midpoint (screen coords) at the start of the current gesture frame.
+var _gesture_prev_mid: Vector2 = Vector2.ZERO
+
 ## Base volume_db values for each AudioStreamPlayer (before volume scaling).
 const PICKUP_BASE_DB: float = -10.0
 const SNAP_BASE_DB: float = -6.0
@@ -248,6 +275,11 @@ const MIN_VOLUME_LINEAR: float = 0.0001
 
 ## Background colour of the board entry fade-in overlay.
 const ENTRY_OVERLAY_COLOR := Color(0.05, 0.05, 0.10, 1.0)
+
+## Font colour for the workspace-expand toggle button when the bottom panel is
+## visible (normal state) and when the workspace is expanded (panel hidden).
+const HUD_BTN_NORMAL_COLOR   := Color(0.88, 0.82, 0.98)
+const HUD_BTN_ACTIVE_COLOR   := Color(0.55, 0.85, 0.55)
 
 ## Time in seconds between each piece's scale-in animation during board entry.
 ## Enhanced with accelerating stagger for smoother flow.
@@ -276,8 +308,11 @@ const BOX_BUTTON_H: float = 34.0
 
 
 func _ready() -> void:
-	# Set HUD bar height based on orientation and screen scale.
-	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+	# Set HUD bar height based on orientation, screen scale, and safe area.
+	# The safe area top inset (notch / status bar) is folded into HUD_H so the
+	# top bar always covers the full inset and the puzzle canvas starts below it.
+	var safe_insets := UIScale.safe_area_insets()
+	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0) + safe_insets["top"]
 	_last_portrait = UIScale.is_portrait()
 
 	_generator = PuzzleGeneratorScript.new()
@@ -326,11 +361,17 @@ func _process(delta: float) -> void:
 		if current_s != _timer_last_s:
 			_timer_last_s = current_s
 			_update_timer_label()
-	if _dragged_piece != null and GameState.feedback_visual and GameState.snap_to_board:
+	if _dragged_piece != null:
 		var current_pos: Vector2 = _dragged_piece.global_position
 		if current_pos != _last_drag_pos:
 			_last_drag_pos = current_pos
-			queue_redraw()
+			# Only redraw the snap-hint highlight when both settings are on.
+			if GameState.feedback_visual and GameState.snap_to_board:
+				queue_redraw()
+			# Update the sorting-box drop highlight only when the piece has
+			# actually moved, avoiding a per-frame hit-test loop when the
+			# dragged piece is stationary (e.g. between touch events).
+			_update_box_drop_highlight()
 
 
 ## Draws a highlight rectangle at the target position of the dragged piece when
@@ -368,6 +409,14 @@ func _get_bottom_panel_height() -> float:
 	return UIScale.px(base_height)
 
 
+## Returns the effective space reserved at the bottom of the canvas, which
+## is the panel height plus the safe area bottom inset (gesture strip / home
+## indicator).  Used for puzzle layout calculations so pieces never spawn or
+## sit behind the bottom UI or the system gesture area.
+func _get_bottom_reserved_height() -> float:
+	return _get_bottom_panel_height() + UIScale.safe_area_insets()["bottom"]
+
+
 func _build_hud() -> void:
 	# Semi-transparent top bar – reference stored for layout updates.
 	_hud_top_bar = ColorRect.new()
@@ -379,10 +428,12 @@ func _build_hud() -> void:
 	# Button / counter row – reference stored for layout updates.
 	_hud_hbox = HBoxContainer.new()
 	_hud_hbox.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hud_hbox.offset_left   = 8
-	_hud_hbox.offset_right  = -8
+	var safe_insets := UIScale.safe_area_insets()
+	_hud_hbox.offset_top    = safe_insets["top"]
+	_hud_hbox.offset_left   = 8 + safe_insets["left"]
+	_hud_hbox.offset_right  = -8 - safe_insets["right"]
 	_hud_hbox.offset_bottom = HUD_H
-	_hud_hbox.add_theme_constant_override("separation", 12)
+	_hud_hbox.add_theme_constant_override("separation", UIScale.px(16 if UIScale.is_mobile() else 12))
 	_hud.add_child(_hud_hbox)
 
 	_hud_buttons.clear()
@@ -424,13 +475,31 @@ func _build_hud() -> void:
 	_counter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	info_hbox.add_child(_counter_label)
 
+	# Expand workspace toggle – mobile only.  Hides the bottom panel so the
+	# full screen is available for puzzle solving.
+	if UIScale.is_mobile():
+		_bottom_panel_toggle_btn = _make_hud_button("▼")
+		_bottom_panel_toggle_btn.tooltip_text = "Expand workspace"
+		_bottom_panel_toggle_btn.custom_minimum_size = Vector2(UIScale.px(48), UIScale.px(48))
+		_bottom_panel_toggle_btn.pressed.connect(_toggle_workspace_expand)
+		_hud_hbox.add_child(_bottom_panel_toggle_btn)
+		_hud_buttons.append(_bottom_panel_toggle_btn)
+
+	# Reference image quick-toggle – available on all platforms.
+	_ref_quick_toggle_btn = _make_hud_button("Ref")
+	_ref_quick_toggle_btn.tooltip_text = "Toggle reference image"
+	_ref_quick_toggle_btn.pressed.connect(_on_ref_quick_toggle_pressed)
+	_hud_hbox.add_child(_ref_quick_toggle_btn)
+	_hud_buttons.append(_ref_quick_toggle_btn)
+
 	var settings_btn := _make_hud_button("Menu")
 	settings_btn.icon = ICON_MENU
 	settings_btn.pressed.connect(_toggle_settings_panel)
 	settings_btn.tooltip_text = "Game menu"
-	settings_btn.custom_minimum_size = Vector2(HUD_H - 8, 0)
+	settings_btn.custom_minimum_size = Vector2(HUD_H - 8, UIScale.px(48))
 	_hud_hbox.add_child(settings_btn)
 	_hud_buttons.append(settings_btn)
+	_hud_menu_btn = settings_btn
 
 	_save_slot_label = Label.new()
 	_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
@@ -450,6 +519,7 @@ func _make_hud_button(label_text: String) -> Button:
 	var portrait := UIScale.is_portrait()
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48))
 
 	var padding_v := UIScale.px(12.0 if portrait else 8.0)
 	var padding_h := UIScale.px(16.0 if portrait else 12.0)
@@ -475,13 +545,18 @@ func _make_hud_button(label_text: String) -> Button:
 ## Updates the HUD bar height and button styles to match the current layout.
 ## Called when UIScale emits layout_changed (orientation flip or window resize).
 func _on_layout_changed() -> void:
-	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+	var safe := UIScale.safe_area_insets()
+	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0) + safe["top"]
 
 	if _hud_top_bar != null:
 		_hud_top_bar.offset_bottom = HUD_H
 
 	if _hud_hbox != null:
+		_hud_hbox.offset_top    = safe["top"]
+		_hud_hbox.offset_left   = 8 + safe["left"]
+		_hud_hbox.offset_right  = -8 - safe["right"]
 		_hud_hbox.offset_bottom = HUD_H
+		_hud_hbox.add_theme_constant_override("separation", UIScale.px(16 if UIScale.is_mobile() else 12))
 
 	if _counter_label != null:
 		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(13))
@@ -495,9 +570,11 @@ func _on_layout_changed() -> void:
 	var portrait := UIScale.is_portrait()
 	var padding_v := UIScale.px(12.0 if portrait else 8.0)
 	var padding_h := UIScale.px(16.0 if portrait else 12.0)
+	var min_h: int = UIScale.px(48)
 	for btn in _hud_buttons:
 		btn.add_theme_font_size_override(
 			"font_size", UIScale.font_size(18 if portrait else 16))
+		btn.custom_minimum_size = Vector2(btn.custom_minimum_size.x, min_h)
 		for state in ["normal", "hover", "pressed"]:
 			var sb: StyleBoxFlat = btn.get_theme_stylebox(state) as StyleBoxFlat
 			if sb != null:
@@ -506,16 +583,22 @@ func _on_layout_changed() -> void:
 				sb.content_margin_top    = padding_v
 				sb.content_margin_bottom = padding_v
 
+	# Keep the Menu button wide enough to comfortably display its icon + text
+	# and preserve the 48px touch-target height set above.
+	if _hud_menu_btn != null:
+		_hud_menu_btn.custom_minimum_size = Vector2(HUD_H - 8, min_h)
+
 	# Reposition the settings panel below the (possibly resized) HUD bar.
 	if _settings_panel != null:
 		_settings_panel.offset_top    = HUD_H + 4
 		_settings_panel.offset_bottom = HUD_H + 4 + _settings_panel_height()
 
-	# Reposition the bottom panel at the bottom of the screen.
+	# Reposition the bottom panel at the bottom of the screen, above the safe area.
 	if _bottom_panel != null:
 		var panel_h := _get_bottom_panel_height()
-		_bottom_panel.offset_top    = -panel_h
-		_bottom_panel.offset_bottom = 0
+		var safe_bottom := safe["bottom"]
+		_bottom_panel.offset_top    = -(panel_h + safe_bottom)
+		_bottom_panel.offset_bottom = -safe_bottom
 
 	# Rebuild the puzzle when the device orientation flips (portrait ↔ landscape)
 	# so that all piece positions and the grid layout fit the new screen dimensions.
@@ -537,12 +620,14 @@ func _settings_panel_height() -> int:
 # ─── Workspace zoom and pan ───────────────────────────────────────────────────
 
 ## Resets the workspace camera to the default 1:1 zoom centred on the viewport.
-## Also clears any in-progress pan gesture.
+## Also clears any in-progress pan gesture or multi-touch gesture state.
 func _reset_camera() -> void:
 	if _camera == null:
 		return
 	_zoom_level = 1.0
 	_panning = false
+	_touch_points.clear()
+	_touch_gesture_active = false
 	_camera.zoom = Vector2.ONE
 	_camera.position = get_viewport_rect().size * 0.5
 
@@ -615,6 +700,76 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## Handles raw multi-touch input for platforms (e.g. Android) that do not
+## synthesise InputEventMagnifyGesture / InputEventPanGesture from touch.
+##
+## Tracks up to two simultaneous finger contacts.  When exactly two fingers
+## are active the method:
+##   • computes pinch zoom from the change in inter-finger distance, and
+##   • pans the camera by the change in the gesture midpoint.
+##
+## Using _input (rather than _unhandled_input) lets the board consume touch
+## events before puzzle pieces' _input_event handlers see them, preventing
+## pieces from starting a drag while a two-finger gesture is in progress.
+func _input(event: InputEvent) -> void:
+	if _camera == null:
+		return
+
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_touch_points[touch.index] = touch.position
+		else:
+			_touch_points.erase(touch.index)
+
+		if _touch_points.size() >= 2:
+			# Second (or additional) finger landed – start a fresh gesture frame
+			# and cancel any piece drag that was in progress.
+			var keys: Array = _touch_points.keys()
+			var pos_a: Vector2 = _touch_points[keys[0]]
+			var pos_b: Vector2 = _touch_points[keys[1]]
+			_gesture_prev_dist = pos_a.distance_to(pos_b)
+			_gesture_prev_mid  = (pos_a + pos_b) * 0.5
+			if not _touch_gesture_active:
+				_touch_gesture_active = true
+				_cancel_all_piece_drags()
+			get_viewport().set_input_as_handled()
+		else:
+			_touch_gesture_active = false
+
+	elif event is InputEventScreenDrag and _touch_gesture_active:
+		# Update the stored position for the moving finger.
+		var drag := event as InputEventScreenDrag
+		_touch_points[drag.index] = drag.position
+
+		if _touch_points.size() >= 2:
+			var keys: Array = _touch_points.keys()
+			var pos_a: Vector2 = _touch_points[keys[0]]
+			var pos_b: Vector2 = _touch_points[keys[1]]
+			var new_dist: float = pos_a.distance_to(pos_b)
+			var new_mid: Vector2 = (pos_a + pos_b) * 0.5
+
+			# Pinch: zoom at the gesture midpoint proportional to distance change.
+			if _gesture_prev_dist > 0.0:
+				_zoom_at_point(new_dist / _gesture_prev_dist, new_mid)
+
+			# Pan: shift the camera by the midpoint delta (corrected for zoom).
+			_camera.position -= (new_mid - _gesture_prev_mid) / _zoom_level
+
+			_gesture_prev_dist = new_dist
+			_gesture_prev_mid  = new_mid
+
+		get_viewport().set_input_as_handled()
+
+
+## Cancels any in-progress piece drags without snapping.
+## Called when a multi-touch gesture begins so pieces don't fight the camera.
+func _cancel_all_piece_drags() -> void:
+	for piece in _pieces:
+		if is_instance_valid(piece):
+			piece.cancel_drag()
+
+
 ## Builds a floating game-menu panel anchored below the HUD bar.
 ## The panel includes: difficulty selector, audio/visual settings toggles,
 ## and a volume slider – serving as the game's in-play menu.
@@ -683,7 +838,7 @@ func _build_settings_panel() -> void:
 	vbox.add_child(diff_lbl)
 
 	var diff_row := HBoxContainer.new()
-	diff_row.add_theme_constant_override("separation", 4)
+	diff_row.add_theme_constant_override("separation", UIScale.px(8 if UIScale.is_mobile() else 4))
 	vbox.add_child(diff_row)
 
 	_menu_diff_btns.clear()
@@ -858,6 +1013,8 @@ func _make_menu_small_button(label_text: String) -> Button:
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	btn.add_theme_font_size_override("font_size", 12)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48 if UIScale.is_mobile() else 28))
+	var margin_v: int = UIScale.px(10 if UIScale.is_mobile() else 4)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -870,8 +1027,8 @@ func _make_menu_small_button(label_text: String) -> Button:
 		sb.corner_radius_bottom_right = 5
 		sb.content_margin_left   = 6
 		sb.content_margin_right  = 6
-		sb.content_margin_top    = 4
-		sb.content_margin_bottom = 4
+		sb.content_margin_top    = margin_v
+		sb.content_margin_bottom = margin_v
 		btn.add_theme_stylebox_override(state, sb)
 	return btn
 
@@ -968,6 +1125,9 @@ func _on_zoom_backdrop_input(event: InputEvent) -> void:
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			if _zoom_overlay != null:
 				_zoom_overlay.visible = false
+			# Reset the TopBar quick-toggle button to its normal colour.
+			if _ref_quick_toggle_btn != null:
+				_ref_quick_toggle_btn.add_theme_color_override("font_color", HUD_BTN_NORMAL_COLOR)
 
 
 ## Toggles the optional reference image panel and updates the button label.
@@ -980,6 +1140,39 @@ func _toggle_preview() -> void:
 		_zoom_overlay.visible = false
 	if _preview_toggle_btn != null:
 		_preview_toggle_btn.text = "Preview: On" if _preview_panel.visible else "Preview: Off"
+	# Keep the TopBar quick-toggle button in sync.
+	if _ref_quick_toggle_btn != null:
+		var active_color := HUD_BTN_ACTIVE_COLOR if (_zoom_overlay != null and _zoom_overlay.visible) else HUD_BTN_NORMAL_COLOR
+		_ref_quick_toggle_btn.add_theme_color_override("font_color", active_color)
+
+
+## Toggles the fullscreen reference image overlay from the TopBar quick-toggle
+## button.  When the overlay becomes visible the button is highlighted; when it
+## is hidden the button returns to its normal colour.
+func _on_ref_quick_toggle_pressed() -> void:
+	if _zoom_overlay == null:
+		return
+	_zoom_overlay.visible = not _zoom_overlay.visible
+	if _ref_quick_toggle_btn != null:
+		var active_color := HUD_BTN_ACTIVE_COLOR if _zoom_overlay.visible else HUD_BTN_NORMAL_COLOR
+		_ref_quick_toggle_btn.add_theme_color_override("font_color", active_color)
+
+
+## Toggles workspace expand mode on mobile: hides the bottom panel to give the
+## player the full screen for puzzle solving.  Pressing again restores the panel.
+func _toggle_workspace_expand() -> void:
+	_bottom_panel_expanded = not _bottom_panel_expanded
+
+	if _bottom_panel != null:
+		_bottom_panel.visible = _bottom_panel_expanded
+
+	# Update toggle button label and colour to reflect the current state.
+	if _bottom_panel_toggle_btn != null:
+		_bottom_panel_toggle_btn.text = "▼" if _bottom_panel_expanded else "▲"
+		_bottom_panel_toggle_btn.tooltip_text = "Expand workspace" if _bottom_panel_expanded else "Restore panel"
+		# Highlight the button when workspace is expanded (panel hidden).
+		var active_color := HUD_BTN_ACTIVE_COLOR if not _bottom_panel_expanded else HUD_BTN_NORMAL_COLOR
+		_bottom_panel_toggle_btn.add_theme_color_override("font_color", active_color)
 
 
 ## Applies the current GameState.volume to all AudioStreamPlayers.
@@ -1019,8 +1212,9 @@ func _build_bottom_panel() -> void:
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
 	var panel_h := _get_bottom_panel_height()
-	panel.offset_top    = -panel_h
-	panel.offset_bottom = 0
+	var safe_bottom := UIScale.safe_area_insets()["bottom"]
+	panel.offset_top    = -(panel_h + safe_bottom)
+	panel.offset_bottom = -safe_bottom
 	_hud.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -1036,7 +1230,7 @@ func _build_bottom_panel() -> void:
 
 	# Left section: Action buttons
 	var left_vbox := VBoxContainer.new()
-	left_vbox.add_theme_constant_override("separation", 8)
+	left_vbox.add_theme_constant_override("separation", UIScale.px(10 if UIScale.is_mobile() else 8))
 	left_vbox.custom_minimum_size = Vector2(UIScale.px(140), 0)
 	main_hbox.add_child(left_vbox)
 
@@ -1127,7 +1321,7 @@ func _build_bottom_panel() -> void:
 	right_vbox.add_child(boxes_scroll)
 
 	_box_vbox = VBoxContainer.new()
-	_box_vbox.add_theme_constant_override("separation", 4)
+	_box_vbox.add_theme_constant_override("separation", UIScale.px(8 if UIScale.is_mobile() else 4))
 	_box_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	boxes_scroll.add_child(_box_vbox)
 
@@ -1145,14 +1339,14 @@ func _build_bottom_panel() -> void:
 	_box_vbox.add_child(add_sep)
 
 	var add_row := HBoxContainer.new()
-	add_row.add_theme_constant_override("separation", 4)
+	add_row.add_theme_constant_override("separation", UIScale.px(8 if UIScale.is_mobile() else 4))
 	_box_vbox.add_child(add_row)
 
 	var name_edit := LineEdit.new()
 	name_edit.placeholder_text = "New box…"
 	name_edit.add_theme_font_size_override("font_size", UIScale.font_size(11))
 	name_edit.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	name_edit.custom_minimum_size = Vector2(0, UIScale.px(24))
+	name_edit.custom_minimum_size = Vector2(0, UIScale.px(48 if UIScale.is_mobile() else 24))
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_row.add_child(name_edit)
 
@@ -1179,7 +1373,9 @@ func _make_bottom_button(label_text: String) -> Button:
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(13))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48))
 
+	var margin_v: int = UIScale.px(10)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -1192,8 +1388,8 @@ func _make_bottom_button(label_text: String) -> Button:
 		sb.corner_radius_bottom_right = 5
 		sb.content_margin_left   = 8
 		sb.content_margin_right  = 8
-		sb.content_margin_top    = 6
-		sb.content_margin_bottom = 6
+		sb.content_margin_top    = margin_v
+		sb.content_margin_bottom = margin_v
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
@@ -1274,17 +1470,17 @@ func _build_complete_overlay() -> void:
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(btn_row)
 
-	var menu_btn := _make_hud_button("Back to Menu")
-	menu_btn.pressed.connect(_on_back_pressed)
-	btn_row.add_child(menu_btn)
+	var play_again_btn := _make_hud_button("Play Again")
+	play_again_btn.pressed.connect(_on_restart_puzzle)
+	btn_row.add_child(play_again_btn)
 
 	var new_btn := _make_hud_button("New Puzzle")
 	new_btn.pressed.connect(_on_new_puzzle)
 	btn_row.add_child(new_btn)
 
-	var lb_btn := _make_hud_button("Leaderboard")
-	lb_btn.pressed.connect(_show_leaderboard_overlay)
-	btn_row.add_child(lb_btn)
+	var menu_btn := _make_hud_button("Main Menu")
+	menu_btn.pressed.connect(_on_back_pressed)
+	btn_row.add_child(menu_btn)
 
 	# Confetti Node2D added after the card so it renders on top of everything.
 	_confetti = ConfettiEffect.new()
@@ -1351,7 +1547,7 @@ func _build_puzzle() -> void:
 	# screen_piece_h) ensures the assembled puzzle always shows the complete image
 	# without stretching or squishing.
 	var avail_w: float = viewport_size.x * 0.90
-	var bottom_panel_h := _get_bottom_panel_height() if _bottom_panel_expanded else 0.0
+	var bottom_panel_h := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
 	var avail_h: float = (viewport_size.y - HUD_H - bottom_panel_h) * 0.90
 
 	var image := source_texture.get_image()
@@ -1449,6 +1645,9 @@ func _build_puzzle() -> void:
 	_pieces.clear()
 	_pieces_initial_positions.clear()
 
+	# Compute spawn bounds once before the loop to avoid per-piece allocations.
+	var spawn_bottom_reserved := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
+
 	for pd in piece_data_array:
 		var col: int = pd.grid_pos.x
 		var row: int = pd.grid_pos.y
@@ -1494,10 +1693,9 @@ func _build_puzzle() -> void:
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
 		var spawn_half_h := _piece_size.y * 0.5
-		var bottom_panel_h := _get_bottom_panel_height() if _bottom_panel_expanded else 0.0
 		var spawn_pos := Vector2(
 			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
-			randf_range(HUD_H + spawn_half_h, viewport_size.y - bottom_panel_h - spawn_half_h)
+			randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_bottom_reserved - spawn_half_h)
 		)
 		piece.position = spawn_pos
 		_pieces_initial_positions.append(spawn_pos)
@@ -1621,6 +1819,7 @@ func _on_piece_released() -> void:
 	var released_piece = _dragged_piece
 	_dragged_piece = null
 	_last_drag_pos = Vector2.ZERO
+	_clear_box_drop_highlight()
 	queue_redraw()
 	# If the piece was not snapped into its final slot, check whether it was
 	# dropped over a sorting-box button and, if so, store it there.
@@ -2341,8 +2540,10 @@ func _append_box_button(box_idx: int) -> void:
 	btn.add_theme_font_size_override("font_size", 12)
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48 if UIScale.is_mobile() else 28))
 	btn.tooltip_text = "Open box: %s\n(drop pieces here to sort them)" % box.name
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var margin_v: int = UIScale.px(10 if UIScale.is_mobile() else 3)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -2355,8 +2556,8 @@ func _append_box_button(box_idx: int) -> void:
 		sb.corner_radius_bottom_right = 5
 		sb.content_margin_left   = 6
 		sb.content_margin_right  = 6
-		sb.content_margin_top    = 3
-		sb.content_margin_bottom = 3
+		sb.content_margin_top    = margin_v
+		sb.content_margin_bottom = margin_v
 		btn.add_theme_stylebox_override(state, sb)
 
 	var i := box_idx
@@ -2376,7 +2577,8 @@ func _make_small_icon_button(label_text: String) -> Button:
 	btn.text = label_text
 	btn.add_theme_font_size_override("font_size", 14)
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	btn.custom_minimum_size = Vector2(26, 26)
+	var btn_size: int = UIScale.px(48 if UIScale.is_mobile() else 32)
+	btn.custom_minimum_size = Vector2(btn_size, btn_size)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
@@ -2791,6 +2993,75 @@ func _try_add_piece_to_box(piece) -> void:
 			return
 
 
+## Updates the drop-target highlight on sorting-box buttons while a piece is
+## being dragged.  Highlights the button under the mouse cursor and clears the
+## highlight when the cursor moves away.
+func _update_box_drop_highlight() -> void:
+	var mouse_pos := get_viewport().get_mouse_position()
+	var hovered_idx: int = -1
+	for i in _sorting_boxes.size():
+		var btn: Button = _sorting_boxes[i].get("button")
+		if btn != null and is_instance_valid(btn) and btn.get_global_rect().has_point(mouse_pos):
+			hovered_idx = i
+			break
+	if hovered_idx != _drag_highlight_box_idx:
+		_clear_box_drop_highlight()
+		if hovered_idx != -1:
+			_set_box_drop_highlight(hovered_idx)
+
+
+## Applies a drop-target highlight style to the sorting-box button at box_idx.
+func _set_box_drop_highlight(box_idx: int) -> void:
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	var btn: Button = _sorting_boxes[box_idx].get("button")
+	if btn == null or not is_instance_valid(btn):
+		return
+	_drag_highlight_box_idx = box_idx
+	var sb := _make_box_button_style(Color(0.42, 0.72, 0.42), true)
+	btn.add_theme_stylebox_override("normal", sb)
+
+
+## Removes the drop-target highlight from the currently highlighted box button,
+## restoring it to its default style.
+func _clear_box_drop_highlight() -> void:
+	if _drag_highlight_box_idx == -1:
+		return
+	var box_idx := _drag_highlight_box_idx
+	_drag_highlight_box_idx = -1
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	var btn: Button = _sorting_boxes[box_idx].get("button")
+	if btn == null or not is_instance_valid(btn):
+		return
+	var sb := _make_box_button_style(Color(0.25, 0.16, 0.48), false)
+	btn.add_theme_stylebox_override("normal", sb)
+
+
+## Creates a StyleBoxFlat for a sorting-box button with the given background
+## color.  When highlighted is true a contrasting green border is added to
+## signal that the box is a valid drop target.
+func _make_box_button_style(bg_color: Color, highlighted: bool) -> StyleBoxFlat:
+	var margin_v: int = UIScale.px(10 if UIScale.is_mobile() else 3)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg_color
+	if highlighted:
+		sb.border_color = Color(0.55, 0.90, 0.55)
+		sb.border_width_left   = 2
+		sb.border_width_right  = 2
+		sb.border_width_top    = 2
+		sb.border_width_bottom = 2
+	sb.corner_radius_top_left     = 5
+	sb.corner_radius_top_right    = 5
+	sb.corner_radius_bottom_left  = 5
+	sb.corner_radius_bottom_right = 5
+	sb.content_margin_left   = 6
+	sb.content_margin_right  = 6
+	sb.content_margin_top    = margin_v
+	sb.content_margin_bottom = margin_v
+	return sb
+
+
 ## Adds a new custom sorting box and appends its button to the panel.
 func _add_custom_box(box_name: String) -> void:
 	var new_idx := _sorting_boxes.size()
@@ -2812,3 +3083,4 @@ func _clear_all_sorting_boxes() -> void:
 			btn.text = "%s [0]" % box.name
 	_close_box_view()
 	_hide_box_hover_preview()
+	_drag_highlight_box_idx = -1

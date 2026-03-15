@@ -79,3 +79,123 @@ func test_locked_piece_has_input_disabled() -> void:
 	# Both flags must be set so the piece cannot be picked up again.
 	assert_bool(piece.is_locked).is_true()
 	assert_bool(piece.input_pickable).is_false()
+
+
+## cancel_drag must end an active drag without snapping the piece to its target.
+func test_cancel_drag_stops_drag_without_snapping() -> void:
+	var target := Vector2(200.0, 150.0)
+	var piece := _make_piece(target, 50.0)
+
+	# Simulate a drag that started inside the snap threshold.
+	var drop_pos := target + Vector2(10.0, 0.0)
+	piece.global_position = drop_pos
+	piece._dragging = true
+
+	piece.cancel_drag()
+
+	# Drag must be cancelled.
+	assert_bool(piece._dragging).is_false()
+	# The piece must NOT have snapped – cancel_drag does not snap.
+	assert_bool(piece.is_locked).is_false()
+	# Position should be unchanged from where it was when cancel happened.
+	assert_vector2(piece.global_position).is_equal(drop_pos)
+
+
+## cancel_drag on a non-dragging piece must be a no-op.
+func test_cancel_drag_noop_when_not_dragging() -> void:
+	var piece := _make_piece(Vector2(100.0, 100.0), 50.0)
+
+	# Should not raise or change any state.
+	piece.cancel_drag()
+
+	assert_bool(piece._dragging).is_false()
+	assert_bool(piece.is_locked).is_false()
+
+
+## cancel_drag must also clear a pending drag (press registered but threshold
+## not yet exceeded).
+func test_cancel_drag_clears_pending_drag() -> void:
+	var piece := _make_piece(Vector2(100.0, 100.0), 50.0)
+
+	piece._pending_drag = true
+	piece._drag_touch_index = 1
+
+	piece.cancel_drag()
+
+	assert_bool(piece._pending_drag).is_false()
+	assert_int(piece._drag_touch_index).is_equal(-1)
+
+
+## Snapping a piece emits the piece_placed signal so PuzzleBoard can update
+## its counter, play audio, and check for puzzle completion.
+func test_piece_placed_signal_emitted_on_snap() -> void:
+	var target := Vector2(200.0, 150.0)
+	var piece := _make_piece(target, 50.0)
+
+	monitor_signals(piece)
+
+	piece.global_position = target + Vector2(20.0, 0.0)
+	piece._dragging = true
+	piece._end_drag()
+
+	assert_signal(piece).is_emitted("piece_placed")
+
+
+## Snapping must work correctly when GameState.feedback_visual is disabled
+## so that toggling visual effects never interferes with core snap logic.
+func test_snap_works_with_visual_feedback_disabled() -> void:
+	var saved := GameState.feedback_visual
+	GameState.feedback_visual = false
+
+	var target := Vector2(100.0, 80.0)
+	var piece := _make_piece(target, 50.0)
+
+	piece.global_position = target + Vector2(25.0, 0.0)
+	piece._dragging = true
+	piece._end_drag()
+
+	GameState.feedback_visual = saved
+
+	assert_bool(piece.is_locked).is_true()
+	assert_vector2(piece.global_position).is_equal(target)
+
+
+## Snapping must work correctly when GameState.feedback_haptic is disabled
+## so that toggling haptic effects never interferes with core snap logic.
+func test_snap_works_with_haptic_feedback_disabled() -> void:
+	var saved := GameState.feedback_haptic
+	GameState.feedback_haptic = false
+
+	var target := Vector2(150.0, 120.0)
+	var piece := _make_piece(target, 50.0)
+
+	piece.global_position = target + Vector2(10.0, 0.0)
+	piece._dragging = true
+	piece._end_drag()
+
+	GameState.feedback_haptic = saved
+
+	assert_bool(piece.is_locked).is_true()
+	assert_vector2(piece.global_position).is_equal(target)
+
+
+## A drag event from a different finger than the one that started the drag
+## must be ignored so multi-touch gestures don't cause erratic piece movement.
+func test_drag_ignores_wrong_touch_index() -> void:
+	var target := Vector2(200.0, 150.0)
+	var piece := _make_piece(target, 50.0)
+
+	# Simulate finger 0 starting a drag and moving the piece to a known position.
+	var initial_pos := target + Vector2(80.0, 0.0)
+	piece.global_position = initial_pos
+	piece._dragging = true
+	piece._drag_offset = Vector2.ZERO
+	piece._drag_touch_index = 0
+
+	# A drag event from finger 1 should not move the piece.
+	var drag := InputEventScreenDrag.new()
+	drag.index = 1
+	drag.position = Vector2(500.0, 500.0)
+	piece._input(drag)
+
+	assert_vector2(piece.global_position).is_equal(initial_pos)

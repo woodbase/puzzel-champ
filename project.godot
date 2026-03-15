@@ -20,7 +20,6 @@ config/version="0.0.5"
 run/main_scene="res://scenes/splash/splash.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="uid://wcs54dexddux"
-<<<<<<<HEADconfig/icon="res://gfx/icon.png"
 
 [autoload]
 

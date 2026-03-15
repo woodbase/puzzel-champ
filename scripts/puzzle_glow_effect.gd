@@ -13,9 +13,13 @@ extends Node2D
 ## Base colour of the victory glow (soft purple/lavender).
 const GLOW_COLOR: Color = Color(0.80, 0.60, 1.0)
 
-## Number of concentric border passes drawn per frame.
+## Number of concentric border passes drawn per frame on desktop.
 ## Higher values produce a wider, softer halo at the cost of more draw calls.
 const GLOW_LAYERS: int = 4
+
+## Reduced layer count on mobile to cut per-frame draw call cost; the effect
+## is still visually clear with fewer concentric borders.
+const GLOW_LAYERS_MOBILE: int = 2
 
 ## Thickness (pixels) of each individual glow layer.
 const LAYER_THICKNESS: float = 5.0
@@ -76,16 +80,25 @@ func _draw() -> void:
 	# Smooth fade curve using ease-out for more natural tapering.
 	var fade_progress: float = _fade_elapsed / FADE_DURATION
 	var fade: float = clampf(1.0 - fade_progress * fade_progress, 0.0, 1.0)
-	# Dual-frequency pulse: fast oscillation modulated by slower wave for complexity.
-	var fast_pulse: float = sin(_time * PULSE_SPEED) * 0.5 + 0.5
-	var slow_pulse: float = sin(_time * PULSE_SPEED * 0.3) * 0.3 + 0.7
-	var pulse: float = fast_pulse * slow_pulse
+
+	var pulse: float
+	if GameState.is_mobile:
+		# Single-frequency pulse on mobile: one sin() call instead of two,
+		# keeping per-frame cost proportional to the reduced layer count.
+		pulse = sin(_time * PULSE_SPEED) * 0.5 + 0.5
+	else:
+		# Dual-frequency pulse: fast oscillation modulated by slower wave for complexity.
+		var fast_pulse: float = sin(_time * PULSE_SPEED) * 0.5 + 0.5
+		var slow_pulse: float = sin(_time * PULSE_SPEED * 0.3) * 0.3 + 0.7
+		pulse = fast_pulse * slow_pulse
+
 	var base_alpha: float = lerp(ALPHA_MIN, ALPHA_MAX, pulse) * fade
 
-	# Draw GLOW_LAYERS concentric outlines, each slightly expanded and dimmer.
-	for i: int in range(GLOW_LAYERS):
+	# Draw concentric outlines (fewer on mobile), each slightly expanded and dimmer.
+	var num_layers: int = GLOW_LAYERS_MOBILE if GameState.is_mobile else GLOW_LAYERS
+	for i: int in range(num_layers):
 		var expand: float = float(i) * LAYER_THICKNESS
 		var expanded_rect: Rect2 = _rect.grow(expand)
 		# Outermost layers are progressively more transparent.
-		var alpha: float = base_alpha * (1.0 - float(i) / float(GLOW_LAYERS))
+		var alpha: float = base_alpha * (1.0 - float(i) / float(num_layers))
 		draw_rect(expanded_rect, Color(GLOW_COLOR, alpha), false, LAYER_THICKNESS)
