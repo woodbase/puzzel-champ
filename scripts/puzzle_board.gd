@@ -361,13 +361,17 @@ func _process(delta: float) -> void:
 		if current_s != _timer_last_s:
 			_timer_last_s = current_s
 			_update_timer_label()
-	if _dragged_piece != null and GameState.feedback_visual and GameState.snap_to_board:
+	if _dragged_piece != null:
 		var current_pos: Vector2 = _dragged_piece.global_position
 		if current_pos != _last_drag_pos:
 			_last_drag_pos = current_pos
-			queue_redraw()
-	if _dragged_piece != null:
-		_update_box_drop_highlight()
+			# Only redraw the snap-hint highlight when both settings are on.
+			if GameState.feedback_visual and GameState.snap_to_board:
+				queue_redraw()
+			# Update the sorting-box drop highlight only when the piece has
+			# actually moved, avoiding a per-frame hit-test loop when the
+			# dragged piece is stationary (e.g. between touch events).
+			_update_box_drop_highlight()
 
 
 ## Draws a highlight rectangle at the target position of the dragged piece when

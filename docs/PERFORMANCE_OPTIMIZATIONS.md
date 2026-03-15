@@ -68,6 +68,30 @@ This document records the performance bottlenecks identified when testing Puzzle
 
 ---
 
+### 7. Unnecessary drag-position updates – `_update_drag` (Minor)
+
+**Symptom:** Touch screens on modern phones report drag events at 120 Hz or faster, producing many near-identical events per visual frame. Each event unconditionally overwrote `global_position`, triggering a redundant Area2D transform recalculation and Sprite2D redraw even when the finger had barely moved.
+
+**Fix (`scripts/puzzle_piece.gd`):** A `MIN_DRAG_MOVE_SQ = 0.25` (≈ 0.5 px) squared-distance guard was added to `_update_drag`. If the new target position is within 0.5 px of the current position, the assignment is skipped entirely. The threshold is sub-pixel and completely imperceptible but eliminates most duplicate events on high-rate touch screens.
+
+---
+
+### 8. Per-frame sorting-box hit-test during drag (Minor)
+
+**Symptom:** `_update_box_drop_highlight()` ran every process frame while a piece was being dragged, even when the piece had not moved since the previous frame (e.g. between two touch events). Each call iterated over all sorting boxes and called `get_global_rect().has_point()`.
+
+**Fix (`scripts/puzzle_board.gd`):** The call is now gated on the same position-change check used for `queue_redraw()`. The hit-test loop only runs when `_dragged_piece.global_position` has changed from `_last_drag_pos`, matching the real rate at which the result could differ.
+
+---
+
+### 9. Completion glow – per-frame draw calls (Minor)
+
+**Symptom:** After puzzle completion the victory glow effect called `queue_redraw()` every frame for 6 seconds, issuing 4 `draw_rect` calls per frame (one per concentric glow layer), plus two `sin()` evaluations for the dual-frequency pulse.
+
+**Fix (`scripts/puzzle_glow_effect.gd`):** On mobile the layer count is reduced from 4 to 2 (`GLOW_LAYERS_MOBILE = 2`) and the pulse is simplified to a single `sin()` call. Per-frame rendering cost of the effect is roughly halved on mobile.
+
+---
+
 ## Summary of Code Changes
 
 | File | Change | Benefit |
@@ -76,7 +100,10 @@ This document records the performance bottlenecks identified when testing Puzzle
 | `scripts/puzzle_generator.gd` | Bezier steps: 3 on mobile, 5 on desktop | Fewer polygon vertices to generate and fill |
 | `scripts/puzzle_board.gd` | `INTERPOLATE_BILINEAR` on mobile, `INTERPOLATE_LANCZOS` on desktop | Puzzle build ~2–4× faster on mobile |
 | `scripts/puzzle_board.gd` | Oversample factor: 1.0 on mobile, 1.35 on desktop | ~45 % reduction in per-piece GPU texture memory |
+| `scripts/puzzle_board.gd` | `_update_box_drop_highlight()` gated on drag-position change | Eliminates per-frame sorting-box hit-test loop when piece is stationary |
 | `scripts/puzzle_piece.gd` | Snap particles: 8 on mobile (down from 18), no scale curve | Lower per-snap CPU/GPU cost |
+| `scripts/puzzle_piece.gd` | `MIN_DRAG_MOVE_SQ` threshold in `_update_drag` | Skips Area2D transform/AABB recalculation for sub-pixel touch events |
+| `scripts/puzzle_glow_effect.gd` | Glow layers: 2 on mobile (down from 4); single-frequency pulse | ~50 % fewer draw calls per frame during victory glow |
 | `scripts/confetti_effect.gd` | Spawn rate: 35/s on mobile (down from 70), duration: 2.5 s | Peak live particles cut by ~69 % |
 
 All mobile-specific paths are gated on `GameState.is_mobile`, which is set once at startup via `OS.has_feature("mobile")` and is `false` on desktop, so desktop behaviour is completely unchanged.
