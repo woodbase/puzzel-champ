@@ -75,6 +75,7 @@ var _gallery_thumb_textures: Array[ImageTexture] = []
 var _gallery_items: Array[PanelContainer]  = []
 var _diff_btns: Array[Button]              = []
 var _shape_btns: Array[Button]             = []
+var _daily_btns: Array[Button]             = []
 
 var _preview_rect: TextureRect   = null
 var _no_image_lbl: Label         = null
@@ -595,6 +596,7 @@ func _build_settings_panel() -> Control:
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(spacer)
 
+	_daily_btns.clear()
 	# ── Resume saved puzzle (shown only when a save exists) ──
 	_resume_btn = _make_resume_button()
 	_resume_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -619,6 +621,7 @@ func _build_settings_panel() -> Control:
 	daily_btn.pressed.connect(_on_daily_start_pressed)
 	daily_btn.tooltip_text = "Fixed 48-piece, no-rotation daily challenge"
 	vbox.add_child(daily_btn)
+	_daily_btns.append(daily_btn)
 
 	# ── Start button ──
 	_start_btn = _make_button("Start Puzzle")
@@ -635,6 +638,9 @@ func _build_settings_panel() -> Control:
 	daily_btn.add_theme_font_size_override("font_size", 22)
 	daily_btn.pressed.connect(start_daily_puzzle)
 	vbox.add_child(daily_btn)
+	_daily_btns.append(daily_btn)
+
+	_refresh_daily_buttons()
 
 	return panel
 
@@ -715,6 +721,23 @@ func _make_resume_button() -> Button:
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
+
+
+func _refresh_daily_buttons() -> void:
+	var completed_today := GameState.has_completed_daily()
+	var base_label := "Daily Puzzle"
+	var tooltip := "Fixed 48-piece, no-rotation daily challenge"
+	if completed_today:
+		var result := GameState.get_daily_result()
+		var elapsed: float = float(result.get("time", 0.0))
+		base_label = "Daily Puzzle (Completed)"
+		tooltip = "Solved today in %s. A new daily arrives tomorrow." \
+			% GameState.format_score_time(elapsed)
+	for btn: Button in _daily_btns:
+		if btn == null:
+			continue
+		btn.text = base_label
+		btn.tooltip_text = tooltip
 
 
 func _set_corner_radius(sb: StyleBoxFlat, r: int) -> void:

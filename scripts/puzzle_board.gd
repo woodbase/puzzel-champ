@@ -1920,6 +1920,8 @@ func _show_complete() -> void:
 	_clear_save()
 	# Persist this run's score to the leaderboard.
 	GameState.save_score(_timer_elapsed, cols, rows)
+	if GameState.is_daily_puzzle:
+		GameState.record_daily_completion(_timer_elapsed)
 	_update_complete_overlay_content()
 	# Dismiss the zoom overlay so it does not cover the completion card.
 	if _zoom_overlay != null:

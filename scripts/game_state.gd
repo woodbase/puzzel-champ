@@ -92,6 +92,24 @@ var allow_rotation: bool = false
 ## True when playing the Daily Puzzle mode. Used to enforce fixed settings.
 var is_daily_puzzle: bool = false
 
+# ─── Daily puzzle persistence ─────────────────────────────────────────────────
+
+## Path where the most recent daily puzzle result is persisted.
+const DAILY_RESULT_PATH := "user://daily_result.json"
+
+## Allows tests to redirect daily-result writes without touching real saves.
+var _daily_result_path: String = DAILY_RESULT_PATH
+
+## Last recorded daily result. Keys:
+##   "date"   – ISO date string (YYYY-MM-DD)
+##   "status" – e.g. "completed"
+##   "time"   – elapsed seconds (float)
+var _daily_result: Dictionary = {
+	"date": "",
+	"status": "",
+	"time": 0.0,
+}
+
 # ─── Leaderboard ─────────────────────────────────────────────────────────────
 
 ## File path where leaderboard scores are persisted between sessions.
@@ -130,6 +148,7 @@ func _ready() -> void:
 		rows = 2
 
 	_load_leaderboard()
+	_load_daily_result()
 
 
 # ─── Leaderboard API ──────────────────────────────────────────────────────────
@@ -202,6 +221,60 @@ func _persist_leaderboard() -> void:
 		push_warning("GameState: could not open leaderboard file for writing.")
 		return
 	file.store_string(JSON.stringify(_leaderboard, "\t"))
+	file.close()
+
+
+# ─── Daily result API ────────────────────────────────────────────────────────
+
+## Returns true when the given date (or today if empty) has a stored completion.
+func has_completed_daily(date_string: String = "") -> bool:
+	var date := date_string if not date_string.is_empty() else Time.get_date_string_from_system()
+	return _daily_result.get("status", "") == "completed" \
+		and _daily_result.get("date", "") == date
+
+
+## Returns a copy of the last recorded daily result.
+func get_daily_result() -> Dictionary:
+	return _daily_result.duplicate()
+
+
+## Records and persists a completed daily puzzle run.
+func record_daily_completion(elapsed_time: float, date_string: String = "") -> void:
+	var date := date_string
+	if date.is_empty():
+		date = Time.get_date_string_from_system()
+	_daily_result = {
+		"date": date,
+		"status": "completed",
+		"time": snappedf(elapsed_time, 0.001),
+	}
+	_persist_daily_result()
+
+
+## Loads the last stored daily result; ignores missing or malformed files.
+func _load_daily_result() -> void:
+	if not FileAccess.file_exists(_daily_result_path):
+		return
+	var file := FileAccess.open(_daily_result_path, FileAccess.READ)
+	if file == null:
+		return
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if parsed is Dictionary:
+		_daily_result = {
+			"date": str(parsed.get("date", "")),
+			"status": str(parsed.get("status", "")),
+			"time": float(parsed.get("time", 0.0)),
+		}
+
+
+## Persists the last recorded daily result to disk.
+func _persist_daily_result() -> void:
+	var file := FileAccess.open(_daily_result_path, FileAccess.WRITE)
+	if file == null:
+		push_warning("GameState: could not open daily result file for writing.")
+		return
+	file.store_string(JSON.stringify(_daily_result, "\t"))
 	file.close()
 
 
