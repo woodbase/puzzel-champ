@@ -276,8 +276,11 @@ const BOX_BUTTON_H: float = 34.0
 
 
 func _ready() -> void:
-	# Set HUD bar height based on orientation and screen scale.
-	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+	# Set HUD bar height based on orientation, screen scale, and safe area.
+	# The safe area top inset (notch / status bar) is folded into HUD_H so the
+	# top bar always covers the full inset and the puzzle canvas starts below it.
+	var safe_insets := UIScale.safe_area_insets()
+	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0) + safe_insets["top"]
 	_last_portrait = UIScale.is_portrait()
 
 	_generator = PuzzleGeneratorScript.new()
@@ -368,6 +371,14 @@ func _get_bottom_panel_height() -> float:
 	return UIScale.px(base_height)
 
 
+## Returns the effective space reserved at the bottom of the canvas, which
+## is the panel height plus the safe area bottom inset (gesture strip / home
+## indicator).  Used for puzzle layout calculations so pieces never spawn or
+## sit behind the bottom UI or the system gesture area.
+func _get_bottom_reserved_height() -> float:
+	return _get_bottom_panel_height() + UIScale.safe_area_insets()["bottom"]
+
+
 func _build_hud() -> void:
 	# Semi-transparent top bar – reference stored for layout updates.
 	_hud_top_bar = ColorRect.new()
@@ -379,8 +390,10 @@ func _build_hud() -> void:
 	# Button / counter row – reference stored for layout updates.
 	_hud_hbox = HBoxContainer.new()
 	_hud_hbox.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_hud_hbox.offset_left   = 8
-	_hud_hbox.offset_right  = -8
+	var safe_insets := UIScale.safe_area_insets()
+	_hud_hbox.offset_top    = safe_insets["top"]
+	_hud_hbox.offset_left   = 8 + safe_insets["left"]
+	_hud_hbox.offset_right  = -8 - safe_insets["right"]
 	_hud_hbox.offset_bottom = HUD_H
 	_hud_hbox.add_theme_constant_override("separation", 12)
 	_hud.add_child(_hud_hbox)
@@ -475,12 +488,16 @@ func _make_hud_button(label_text: String) -> Button:
 ## Updates the HUD bar height and button styles to match the current layout.
 ## Called when UIScale emits layout_changed (orientation flip or window resize).
 func _on_layout_changed() -> void:
-	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0)
+	var safe := UIScale.safe_area_insets()
+	HUD_H = UIScale.px(64.0 if UIScale.is_portrait() else 52.0) + safe["top"]
 
 	if _hud_top_bar != null:
 		_hud_top_bar.offset_bottom = HUD_H
 
 	if _hud_hbox != null:
+		_hud_hbox.offset_top    = safe["top"]
+		_hud_hbox.offset_left   = 8 + safe["left"]
+		_hud_hbox.offset_right  = -8 - safe["right"]
 		_hud_hbox.offset_bottom = HUD_H
 
 	if _counter_label != null:
@@ -511,11 +528,12 @@ func _on_layout_changed() -> void:
 		_settings_panel.offset_top    = HUD_H + 4
 		_settings_panel.offset_bottom = HUD_H + 4 + _settings_panel_height()
 
-	# Reposition the bottom panel at the bottom of the screen.
+	# Reposition the bottom panel at the bottom of the screen, above the safe area.
 	if _bottom_panel != null:
 		var panel_h := _get_bottom_panel_height()
-		_bottom_panel.offset_top    = -panel_h
-		_bottom_panel.offset_bottom = 0
+		var safe_bottom := safe["bottom"]
+		_bottom_panel.offset_top    = -(panel_h + safe_bottom)
+		_bottom_panel.offset_bottom = -safe_bottom
 
 	# Rebuild the puzzle when the device orientation flips (portrait ↔ landscape)
 	# so that all piece positions and the grid layout fit the new screen dimensions.
@@ -1019,8 +1037,9 @@ func _build_bottom_panel() -> void:
 	panel.anchor_top    = 1.0
 	panel.anchor_bottom = 1.0
 	var panel_h := _get_bottom_panel_height()
-	panel.offset_top    = -panel_h
-	panel.offset_bottom = 0
+	var safe_bottom := UIScale.safe_area_insets()["bottom"]
+	panel.offset_top    = -(panel_h + safe_bottom)
+	panel.offset_bottom = -safe_bottom
 	_hud.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -1351,7 +1370,7 @@ func _build_puzzle() -> void:
 	# screen_piece_h) ensures the assembled puzzle always shows the complete image
 	# without stretching or squishing.
 	var avail_w: float = viewport_size.x * 0.90
-	var bottom_panel_h := _get_bottom_panel_height() if _bottom_panel_expanded else 0.0
+	var bottom_panel_h := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
 	var avail_h: float = (viewport_size.y - HUD_H - bottom_panel_h) * 0.90
 
 	var image := source_texture.get_image()
@@ -1494,7 +1513,7 @@ func _build_puzzle() -> void:
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
 		var spawn_half_h := _piece_size.y * 0.5
-		var bottom_panel_h := _get_bottom_panel_height() if _bottom_panel_expanded else 0.0
+		var bottom_panel_h := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
 		var spawn_pos := Vector2(
 			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
 			randf_range(HUD_H + spawn_half_h, viewport_size.y - bottom_panel_h - spawn_half_h)

@@ -19,6 +19,14 @@ var _scale_factor: float = 1.0
 ## Cached portrait flag – true when the viewport is taller than wide.
 var _portrait: bool = false
 
+## Cached safe area insets in viewport pixels – recomputed on every viewport
+## size change.  Non-zero only on devices that report a safe area (notch,
+## status bar, system gesture strip, rounded corners, etc.).
+var _safe_top:    float = 0.0
+var _safe_bottom: float = 0.0
+var _safe_left:   float = 0.0
+var _safe_right:  float = 0.0
+
 
 func _ready() -> void:
 	# Defer the first refresh until the viewport is fully initialised.
@@ -43,6 +51,25 @@ func _refresh() -> void:
 	var sy := vp.y / BASE_HEIGHT
 	_scale_factor = clampf(minf(sx, sy), 0.5, 2.0)
 	_portrait = vp.y > vp.x
+
+	# Compute safe area insets in viewport pixels.
+	# DisplayServer.get_display_safe_area() returns a Rect2i in *screen* pixels.
+	# We scale it to viewport pixels using the screen→viewport ratio so all
+	# callers can work in the same coordinate space as the rest of the UI.
+	var screen := Vector2(DisplayServer.screen_get_size())
+	if screen.x > 0.0 and screen.y > 0.0:
+		var safe := DisplayServer.get_display_safe_area()
+		var ratio_x := vp.x / screen.x
+		var ratio_y := vp.y / screen.y
+		_safe_top    = safe.position.y                          * ratio_y
+		_safe_left   = safe.position.x                          * ratio_x
+		_safe_bottom = (screen.y - safe.position.y - safe.size.y) * ratio_y
+		_safe_right  = (screen.x - safe.position.x - safe.size.x) * ratio_x
+	else:
+		_safe_top    = 0.0
+		_safe_bottom = 0.0
+		_safe_left   = 0.0
+		_safe_right  = 0.0
 
 
 ## Returns the current UI scale factor (1.0 on the reference 1280×720 resolution).
@@ -72,3 +99,17 @@ func px(base: float) -> int:
 ## Use wherever a font_size theme override is set.
 func font_size(base_pt: int) -> int:
 	return roundi(float(base_pt) * _scale_factor)
+
+
+## Returns the safe area insets in viewport pixels.
+## The safe area is the region of the screen not obscured by a notch, rounded
+## corner, status bar, or system gesture strip.  Insets are the distances from
+## each screen edge to the nearest safe boundary.
+## Returns a Dictionary with float keys "top", "bottom", "left", "right".
+func safe_area_insets() -> Dictionary:
+	return {
+		"top":    _safe_top,
+		"bottom": _safe_bottom,
+		"left":   _safe_left,
+		"right":  _safe_right,
+	}
