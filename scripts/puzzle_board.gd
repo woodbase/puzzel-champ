@@ -66,6 +66,11 @@ var _timer_running: bool = false
 ## label updates every frame when the displayed value has not changed.
 var _timer_last_s: int = -1
 
+## Title and subtitle labels inside the completion card.
+var _complete_title_lbl: Label = null
+var _complete_sub_lbl: Label = null
+## Label that shows the solved puzzle's piece count.
+var _complete_pieces_lbl: Label = null
 ## Label inside the completion card that shows the final solve time.
 var _complete_time_lbl: Label = null
 
@@ -75,6 +80,10 @@ var _complete_overlay: Control = null
 ## The completion card panel inside _complete_overlay.
 ## Stored so the card entrance animation can target it.
 var _complete_card: Control = null
+## Completion card buttons so they can be toggled for daily puzzles.
+var _complete_play_again_btn: Button = null
+var _complete_new_btn: Button = null
+var _complete_menu_btn: Button = null
 
 ## Fullscreen leaderboard overlay shown from the completion card or HUD menu.
 var _leaderboard_overlay: Control = null
@@ -1461,19 +1470,19 @@ func _build_complete_overlay() -> void:
 	vbox.add_theme_constant_override("separation", 20)
 	margin.add_child(vbox)
 
-	var complete_title_lbl := Label.new()
-	complete_title_lbl.text = "Puzzle Complete!"
-	complete_title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(40))
-	complete_title_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	complete_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(complete_title_lbl)
+	_complete_title_lbl = Label.new()
+	_complete_title_lbl.text = "Puzzle Complete!"
+	_complete_title_lbl.add_theme_font_size_override("font_size", UIScale.font_size(40))
+	_complete_title_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
+	_complete_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_complete_title_lbl)
 
-	var sub_lbl := Label.new()
-	sub_lbl.text = "Well done – all pieces placed!"
-	sub_lbl.add_theme_font_size_override("font_size", UIScale.font_size(18))
-	sub_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.80))
-	sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(sub_lbl)
+	_complete_sub_lbl = Label.new()
+	_complete_sub_lbl.text = "Well done – all pieces placed!"
+	_complete_sub_lbl.add_theme_font_size_override("font_size", UIScale.font_size(18))
+	_complete_sub_lbl.add_theme_color_override("font_color", Color(0.65, 0.60, 0.80))
+	_complete_sub_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_complete_sub_lbl)
 
 	_complete_time_lbl = Label.new()
 	_complete_time_lbl.text = ""
@@ -1482,22 +1491,29 @@ func _build_complete_overlay() -> void:
 	_complete_time_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_complete_time_lbl)
 
+	_complete_pieces_lbl = Label.new()
+	_complete_pieces_lbl.text = ""
+	_complete_pieces_lbl.add_theme_font_size_override("font_size", UIScale.font_size(20))
+	_complete_pieces_lbl.add_theme_color_override("font_color", Color(0.82, 0.76, 0.94))
+	_complete_pieces_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_complete_pieces_lbl)
+
 	var btn_row := HBoxContainer.new()
 	btn_row.add_theme_constant_override("separation", 14)
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(btn_row)
 
-	var play_again_btn := _make_hud_button("Play Again")
-	play_again_btn.pressed.connect(_on_restart_puzzle)
-	btn_row.add_child(play_again_btn)
+	_complete_play_again_btn = _make_hud_button("Play Again")
+	_complete_play_again_btn.pressed.connect(_on_restart_puzzle)
+	btn_row.add_child(_complete_play_again_btn)
 
-	var new_btn := _make_hud_button("New Puzzle")
-	new_btn.pressed.connect(_on_new_puzzle)
-	btn_row.add_child(new_btn)
+	_complete_new_btn = _make_hud_button("New Puzzle")
+	_complete_new_btn.pressed.connect(_on_new_puzzle)
+	btn_row.add_child(_complete_new_btn)
 
-	var menu_btn := _make_hud_button("Main Menu")
-	menu_btn.pressed.connect(_on_back_pressed)
-	btn_row.add_child(menu_btn)
+	_complete_menu_btn = _make_hud_button("Main Menu")
+	_complete_menu_btn.pressed.connect(_on_back_pressed)
+	btn_row.add_child(_complete_menu_btn)
 
 	# Confetti Node2D added after the card so it renders on top of everything.
 	_confetti = ConfettiEffect.new()
@@ -1866,6 +1882,28 @@ func _on_piece_released() -> void:
 		_try_add_piece_to_box(released_piece)
 
 
+## Updates completion overlay copy and visibility for daily vs normal puzzles.
+func _update_complete_overlay_content() -> void:
+	var is_daily := GameState.is_daily_puzzle
+	if _complete_title_lbl != null:
+		_complete_title_lbl.text = "Daily Puzzle Complete" if is_daily else "Puzzle Complete!"
+	if _complete_sub_lbl != null:
+		_complete_sub_lbl.text = "Today's challenge is solved. See you tomorrow!" \
+				if is_daily else "Well done – all pieces placed!"
+	if _complete_time_lbl != null:
+		_complete_time_lbl.text = "Time: %s" % _format_time(_timer_elapsed)
+	if _complete_pieces_lbl != null:
+		_complete_pieces_lbl.text = "Pieces: %d" % _total_pieces
+
+	var show_standard_buttons := not is_daily
+	if _complete_play_again_btn != null:
+		_complete_play_again_btn.visible = show_standard_buttons
+	if _complete_new_btn != null:
+		_complete_new_btn.visible = show_standard_buttons
+	if _complete_menu_btn != null:
+		_complete_menu_btn.visible = true
+
+
 ## Displays the completion overlay with an entrance animation, plays the
 ## completion fanfare, and launches the confetti victory effect.
 ##
@@ -1882,8 +1920,7 @@ func _show_complete() -> void:
 	_clear_save()
 	# Persist this run's score to the leaderboard.
 	GameState.save_score(_timer_elapsed, cols, rows)
-	if _complete_time_lbl != null:
-		_complete_time_lbl.text = "Time: %s" % _format_time(_timer_elapsed)
+	_update_complete_overlay_content()
 	# Dismiss the zoom overlay so it does not cover the completion card.
 	if _zoom_overlay != null:
 		_zoom_overlay.visible = false
