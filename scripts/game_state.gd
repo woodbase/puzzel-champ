@@ -75,6 +75,9 @@ var difficulty_explicitly_set: bool = false
 ## correct orientation (0°).
 var allow_rotation: bool = false
 
+## True when playing the Daily Puzzle mode. Used to enforce fixed settings.
+var is_daily_puzzle: bool = false
+
 # ─── Leaderboard ─────────────────────────────────────────────────────────────
 
 ## File path where leaderboard scores are persisted between sessions.

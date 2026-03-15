@@ -610,6 +610,13 @@ func _build_settings_panel() -> Control:
 	settings_btn.pressed.connect(_show_settings_overlay)
 	vbox.add_child(settings_btn)
 
+	# ── Daily Puzzle button ──
+	var daily_btn := _make_button("Daily Puzzle")
+	daily_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	daily_btn.pressed.connect(_on_daily_start_pressed)
+	daily_btn.tooltip_text = "Fixed 48-piece, no-rotation daily challenge"
+	vbox.add_child(daily_btn)
+
 	# ── Start button ──
 	_start_btn = _make_button("Start Puzzle")
 	_start_btn.custom_minimum_size = Vector2(0, 54)
@@ -1031,6 +1038,7 @@ func _on_start_pressed() -> void:
 	if _selected_texture == null:
 		_show_error("Please select an image first.")
 		return
+	GameState.is_daily_puzzle = false
 	GameState.difficulty_explicitly_set = true
 	GameState.image_texture = _selected_texture
 	GameState.image_path    = _selected_path
@@ -1044,6 +1052,35 @@ func _on_start_pressed() -> void:
 		var d := DIFFICULTIES[_difficulty_index]
 		GameState.cols = d["cols"]
 		GameState.rows = d["rows"]
+	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
+
+
+## Starts the Daily Puzzle with fixed settings: Expert difficulty (48 pieces),
+## jigsaw shape, and rotation disabled. Uses the first bundled gallery image so
+## every player sees the same puzzle content.
+func _on_daily_start_pressed() -> void:
+	if _gallery_textures.size() > 0:
+		_select_gallery_item(0)
+	if _selected_texture == null:
+		_show_error("Daily puzzle image could not be loaded.")
+		return
+
+	var daily_index := DIFFICULTIES.size() - 1
+	var daily_diff: Dictionary = DIFFICULTIES[daily_index]
+
+	_difficulty_index = daily_index
+	_shape_index = _find_shape_index("jigsaw")
+
+	GameState.is_daily_puzzle = true
+	GameState.difficulty_explicitly_set = true
+	GameState.image_texture = _selected_texture
+	GameState.image_path    = _selected_path
+	GameState.gallery_index = _active_gallery_idx
+	GameState.piece_shape   = "jigsaw"
+	GameState.allow_rotation = false
+	GameState.cols = daily_diff["cols"]
+	GameState.rows = daily_diff["rows"]
+
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
 
 
@@ -1091,6 +1128,7 @@ func _on_resume_pressed() -> void:
 	GameState.allow_rotation         = bool(save_data.get("allow_rotation", false))
 	GameState.difficulty_explicitly_set = true
 	GameState.resume_save            = true
+	GameState.is_daily_puzzle        = bool(save_data.get("is_daily_puzzle", false))
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
 
 

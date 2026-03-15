@@ -832,7 +832,8 @@ func _build_settings_panel() -> void:
 	vbox.add_child(diff_sep)
 
 	var diff_lbl := Label.new()
-	diff_lbl.text = "Difficulty"
+	var daily_locked := GameState.is_daily_puzzle
+	diff_lbl.text = "Difficulty" + (" (fixed for Daily)" if daily_locked else "")
 	diff_lbl.add_theme_font_size_override("font_size", 13)
 	diff_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	vbox.add_child(diff_lbl)
@@ -846,6 +847,9 @@ func _build_settings_panel() -> void:
 		var d: Dictionary = MainMenuScript.DIFFICULTIES[i]
 		var diff_btn := _make_menu_small_button(d["label"])
 		diff_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		diff_btn.disabled = daily_locked
+		if daily_locked:
+			diff_btn.tooltip_text = "Daily puzzle uses a fixed piece count"
 		var di := i
 		diff_btn.pressed.connect(func() -> void: _apply_in_game_difficulty(di))
 		diff_row.add_child(diff_btn)
@@ -910,13 +914,19 @@ func _build_settings_panel() -> void:
 	diff_opts_lbl.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	vbox.add_child(diff_opts_lbl)
 
-	vbox.add_child(_make_feedback_toggle(
+	var rotation_toggle := _make_feedback_toggle(
 		"Rotate pieces",
 		GameState.allow_rotation,
 		func(on: bool) -> void:
 			GameState.allow_rotation = on
 			_on_new_puzzle()
-	))
+	)
+	if GameState.is_daily_puzzle:
+		GameState.allow_rotation = false
+		rotation_toggle.button_pressed = false
+		rotation_toggle.disabled = true
+		rotation_toggle.tooltip_text = "Daily puzzle keeps rotation off"
+	vbox.add_child(rotation_toggle)
 
 	_settings_panel = panel
 
@@ -978,6 +988,8 @@ func _toggle_settings_panel() -> void:
 ## Applies a difficulty preset chosen inside the in-game menu.
 ## Updates GameState, restarts the puzzle immediately.
 func _apply_in_game_difficulty(index: int) -> void:
+	if GameState.is_daily_puzzle:
+		return
 	if index < 0 or index >= MainMenuScript.DIFFICULTIES.size():
 		return
 	var d: Dictionary = MainMenuScript.DIFFICULTIES[index]
@@ -2309,6 +2321,7 @@ func _save_puzzle_state() -> void:
 		"rows": rows,
 		"piece_shape": _piece_shape,
 		"allow_rotation": GameState.allow_rotation,
+		"is_daily_puzzle": GameState.is_daily_puzzle,
 		"elapsed_time": _timer_elapsed,
 		"pieces": pieces_data
 	}
