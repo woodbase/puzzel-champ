@@ -1540,6 +1540,10 @@ func _build_puzzle() -> void:
 	# Reset the workspace camera so every new puzzle starts at the default 1:1 view.
 	_reset_camera()
 
+	# Use a deterministic RNG seed for daily puzzles so the layout stays consistent.
+	if GameState.is_daily_puzzle and GameState.daily_seed != 0:
+		seed(GameState.daily_seed)
+
 	var viewport_size := get_viewport_rect().size
 
 	# Fit the image into 90 % of the available area while preserving its aspect

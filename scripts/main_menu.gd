@@ -618,6 +618,14 @@ func _build_settings_panel() -> Control:
 	_start_btn.pressed.connect(_on_start_pressed)
 	vbox.add_child(_start_btn)
 
+	# ── Daily puzzle button ──
+	var daily_btn := _make_button("Daily Puzzle", ICON_PLAY)
+	daily_btn.custom_minimum_size = Vector2(0, 54)
+	daily_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	daily_btn.add_theme_font_size_override("font_size", 22)
+	daily_btn.pressed.connect(start_daily_puzzle)
+	vbox.add_child(daily_btn)
+
 	return panel
 
 # ─── Widget helpers ───────────────────────────────────────────────────────────
@@ -1032,6 +1040,9 @@ func _on_start_pressed() -> void:
 		_show_error("Please select an image first.")
 		return
 	GameState.difficulty_explicitly_set = true
+	GameState.resume_save = false
+	GameState.is_daily_puzzle = false
+	GameState.daily_seed = 0
 	GameState.image_texture = _selected_texture
 	GameState.image_path    = _selected_path
 	GameState.gallery_index = _active_gallery_idx
@@ -1090,7 +1101,42 @@ func _on_resume_pressed() -> void:
 	GameState.piece_shape            = str(save_data.get("piece_shape", GameState.piece_shape))
 	GameState.allow_rotation         = bool(save_data.get("allow_rotation", false))
 	GameState.difficulty_explicitly_set = true
+	GameState.is_daily_puzzle        = false
+	GameState.daily_seed             = 0
 	GameState.resume_save            = true
+	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
+
+
+## Starts the daily puzzle using the first bundled gallery image and the
+## currently selected difficulty/shape, seeded by today's date.
+func start_daily_puzzle() -> void:
+	var daily_path := DEFAULT_IMAGE_PATHS[0] if DEFAULT_IMAGE_PATHS.size() > 0 else ""
+	var img := Image.load_from_file(daily_path) if daily_path != "" else null
+	if img == null:
+		_show_error("Daily puzzle image is unavailable. Please pick an image and start normally.")
+		return
+
+	_limit_image_size(img)
+	var texture := ImageTexture.create_from_image(img)
+
+	GameState.difficulty_explicitly_set = true
+	GameState.resume_save    = false
+	GameState.is_daily_puzzle = true
+	GameState.daily_seed     = abs(hash(Time.get_date_string_from_system()))
+	GameState.image_texture  = texture
+	GameState.image_path     = daily_path
+	GameState.gallery_index  = 0
+	GameState.piece_shape    = SHAPES[_shape_index]["key"]
+
+	if _use_custom:
+		var cr := _cols_rows_from_piece_count(_custom_piece_count)
+		GameState.cols = cr.x
+		GameState.rows = cr.y
+	else:
+		var d := DIFFICULTIES[_difficulty_index]
+		GameState.cols = d["cols"]
+		GameState.rows = d["rows"]
+
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
 
 
