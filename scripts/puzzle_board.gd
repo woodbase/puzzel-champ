@@ -1470,17 +1470,17 @@ func _build_complete_overlay() -> void:
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_child(btn_row)
 
-	var menu_btn := _make_hud_button("Back to Menu")
-	menu_btn.pressed.connect(_on_back_pressed)
-	btn_row.add_child(menu_btn)
+	var play_again_btn := _make_hud_button("Play Again")
+	play_again_btn.pressed.connect(_on_restart_puzzle)
+	btn_row.add_child(play_again_btn)
 
 	var new_btn := _make_hud_button("New Puzzle")
 	new_btn.pressed.connect(_on_new_puzzle)
 	btn_row.add_child(new_btn)
 
-	var lb_btn := _make_hud_button("Leaderboard")
-	lb_btn.pressed.connect(_show_leaderboard_overlay)
-	btn_row.add_child(lb_btn)
+	var menu_btn := _make_hud_button("Main Menu")
+	menu_btn.pressed.connect(_on_back_pressed)
+	btn_row.add_child(menu_btn)
 
 	# Confetti Node2D added after the card so it renders on top of everything.
 	_confetti = ConfettiEffect.new()
