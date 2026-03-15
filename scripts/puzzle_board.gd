@@ -144,6 +144,10 @@ var _zoom_overlay: Control = null
 ## Preview toggle button stored so its label can be updated.
 var _preview_toggle_btn: Button = null
 
+## TopBar quick-toggle button for the reference image overlay.
+## Highlighted when the overlay is visible.
+var _ref_quick_toggle_btn: Button = null
+
 ## Difficulty buttons inside the in-game menu panel.
 var _menu_diff_btns: Array[Button] = []
 
@@ -463,6 +467,13 @@ func _build_hud() -> void:
 		_bottom_panel_toggle_btn.pressed.connect(_toggle_workspace_expand)
 		_hud_hbox.add_child(_bottom_panel_toggle_btn)
 		_hud_buttons.append(_bottom_panel_toggle_btn)
+
+	# Reference image quick-toggle – available on all platforms.
+	_ref_quick_toggle_btn = _make_hud_button("Ref")
+	_ref_quick_toggle_btn.tooltip_text = "Toggle reference image"
+	_ref_quick_toggle_btn.pressed.connect(_on_ref_quick_toggle_pressed)
+	_hud_hbox.add_child(_ref_quick_toggle_btn)
+	_hud_buttons.append(_ref_quick_toggle_btn)
 
 	var settings_btn := _make_hud_button("Menu")
 	settings_btn.icon = ICON_MENU
@@ -1025,6 +1036,9 @@ func _on_zoom_backdrop_input(event: InputEvent) -> void:
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			if _zoom_overlay != null:
 				_zoom_overlay.visible = false
+			# Reset the TopBar quick-toggle button to its normal colour.
+			if _ref_quick_toggle_btn != null:
+				_ref_quick_toggle_btn.add_theme_color_override("font_color", HUD_BTN_NORMAL_COLOR)
 
 
 ## Toggles the optional reference image panel and updates the button label.
@@ -1037,6 +1051,22 @@ func _toggle_preview() -> void:
 		_zoom_overlay.visible = false
 	if _preview_toggle_btn != null:
 		_preview_toggle_btn.text = "Preview: On" if _preview_panel.visible else "Preview: Off"
+	# Keep the TopBar quick-toggle button in sync.
+	if _ref_quick_toggle_btn != null:
+		var active_color := HUD_BTN_ACTIVE_COLOR if (_zoom_overlay != null and _zoom_overlay.visible) else HUD_BTN_NORMAL_COLOR
+		_ref_quick_toggle_btn.add_theme_color_override("font_color", active_color)
+
+
+## Toggles the fullscreen reference image overlay from the TopBar quick-toggle
+## button.  When the overlay becomes visible the button is highlighted; when it
+## is hidden the button returns to its normal colour.
+func _on_ref_quick_toggle_pressed() -> void:
+	if _zoom_overlay == null:
+		return
+	_zoom_overlay.visible = not _zoom_overlay.visible
+	if _ref_quick_toggle_btn != null:
+		var active_color := HUD_BTN_ACTIVE_COLOR if _zoom_overlay.visible else HUD_BTN_NORMAL_COLOR
+		_ref_quick_toggle_btn.add_theme_color_override("font_color", active_color)
 
 
 ## Toggles workspace expand mode on mobile: hides the bottom panel to give the
