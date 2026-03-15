@@ -57,3 +57,28 @@ func test_create_piece_texture_square_preserves_pixels() -> void:
 	assert_color(result.get_pixel(1, 0)).is_equal(Color.GREEN)
 	assert_color(result.get_pixel(0, 1)).is_equal(Color.BLUE)
 	assert_color(result.get_pixel(1, 1)).is_equal(Color.WHITE)
+
+
+func test_generate_edges_is_seeded() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 12345
+	var generator := PuzzleGenerator.new()
+	var edges_a := generator.generate_edges(2, 2, rng)
+
+	rng.seed = 12345
+	var generator_b := PuzzleGenerator.new()
+	var edges_b := generator_b.generate_edges(2, 2, rng)
+
+	assert_array(_edge_signatures(edges_a)).is_equal(_edge_signatures(edges_b))
+
+
+func _edge_signatures(pieces: Array) -> Array:
+	var result: Array = []
+	for pd in pieces:
+		result.append([
+			pd.edges["top"],
+			pd.edges["right"],
+			pd.edges["bottom"],
+			pd.edges["left"],
+		])
+	return result
