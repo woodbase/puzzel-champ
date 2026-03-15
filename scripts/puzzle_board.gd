@@ -47,6 +47,9 @@ var _placed_pieces: int = 0
 ## Generator instance.
 var _generator: Object = null
 
+## Random number generator used for puzzle construction (seeded per run).
+var _rng: RandomNumberGenerator = null
+
 ## HUD label showing piece progress.
 var _counter_label: Label = null
 
@@ -113,6 +116,8 @@ var _pieces: Array = []
 ## Initial spawn positions recorded for each piece during _build_puzzle().
 ## Used by _on_restart_puzzle() to return pieces to their starting positions.
 var _pieces_initial_positions: Array[Vector2] = []
+## Initial rotation steps recorded during _build_puzzle() when rotation is enabled.
+var _pieces_initial_rotations: Array[int] = []
 
 ## Full-screen dark overlay used for the puzzle-image fade-in animation.
 ## Freed automatically once the fade-out completes.
@@ -1525,6 +1530,18 @@ func _show_no_image_message() -> void:
 	vbox.add_child(btn)
 
 
+# ─── Randomness ──────────────────────────────────────────────────────────────
+
+## Seeds the puzzle RNG using the active GameState puzzle_seed (or legacy default).
+func _reset_rng() -> void:
+	_rng = RandomNumberGenerator.new()
+	var seed_value: int = GameState.puzzle_seed
+	if seed_value == 0:
+		# Legacy fallback for saves that predate seeded puzzles.
+		seed_value = 1
+	_rng.seed = seed_value
+
+
 # ─── Puzzle building ──────────────────────────────────────────────────────────
 
 ## Builds the puzzle dynamically from source_texture using PuzzleGenerator.
@@ -1537,6 +1554,7 @@ func _build_puzzle() -> void:
 		push_error("PuzzleBoard: cols and rows must each be at least 1 (got cols=%d, rows=%d)." % [cols, rows])
 		return
 
+	_reset_rng()
 	# Reset the workspace camera so every new puzzle starts at the default 1:1 view.
 	_reset_camera()
 
@@ -1628,7 +1646,7 @@ func _build_puzzle() -> void:
 	# factor applies to both axes: scale = display_w / img_w = display_h / img_h.
 	var piece_scale: float = display_w / float(img_w) if img_w > 0 else 1.0
 
-	var piece_data_array: Array = _generator.generate_edges(cols, rows)
+	var piece_data_array: Array = _generator.generate_edges(cols, rows, _rng)
 	_total_pieces  = piece_data_array.size()
 	_placed_pieces = 0
 	_update_counter()
@@ -1644,6 +1662,7 @@ func _build_puzzle() -> void:
 
 	_pieces.clear()
 	_pieces_initial_positions.clear()
+	_pieces_initial_rotations.clear()
 
 	# Compute spawn bounds once before the loop to avoid per-piece allocations.
 	var spawn_bottom_reserved := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
@@ -1686,16 +1705,19 @@ func _build_puzzle() -> void:
 
 		# Apply a random 90° rotation when rotation difficulty is enabled.
 		if GameState.allow_rotation:
-			var steps: int = randi() % 4
+			var steps: int = _rng.randi_range(0, 3)
 			piece.rotation_steps = steps
 			piece.rotation_degrees = steps * 90.0
+			_pieces_initial_rotations.append(steps)
+		else:
+			_pieces_initial_rotations.append(0)
 
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
 		var spawn_half_h := _piece_size.y * 0.5
 		var spawn_pos := Vector2(
-			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
-			randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_bottom_reserved - spawn_half_h)
+			_rng.randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
+			_rng.randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_bottom_reserved - spawn_half_h)
 		)
 		piece.position = spawn_pos
 		_pieces_initial_positions.append(spawn_pos)
@@ -2309,6 +2331,8 @@ func _save_puzzle_state() -> void:
 		"rows": rows,
 		"piece_shape": _piece_shape,
 		"allow_rotation": GameState.allow_rotation,
+		"puzzle_seed": GameState.puzzle_seed,
+		"is_daily_puzzle": GameState.is_daily_puzzle,
 		"elapsed_time": _timer_elapsed,
 		"pieces": pieces_data
 	}
@@ -2429,6 +2453,7 @@ func _on_restart_puzzle() -> void:
 	if _building:
 		return
 
+	_reset_rng()
 	_reset_camera()
 
 	if _complete_overlay != null:
@@ -2468,7 +2493,11 @@ func _on_restart_puzzle() -> void:
 		piece.z_index = 0
 		# Re-apply a fresh random rotation when rotation difficulty is enabled.
 		if GameState.allow_rotation:
-			var steps: int = randi() % 4
+			var steps: int
+			if GameState.is_daily_puzzle and i < _pieces_initial_rotations.size():
+				steps = _pieces_initial_rotations[i]
+			else:
+				steps = _rng.randi_range(0, 3) if _rng != null else randi() % 4
 			piece.rotation_steps = steps
 			piece.rotation_degrees = steps * 90.0
 		else:
@@ -2510,6 +2539,7 @@ func _on_new_puzzle() -> void:
 		piece.queue_free()
 	_pieces.clear()
 	_pieces_initial_positions.clear()
+	_pieces_initial_rotations.clear()
 
 	_placed_pieces = 0
 	_total_pieces  = 0

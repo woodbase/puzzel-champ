@@ -64,6 +64,14 @@ var music_enabled: bool = true
 ## Master volume for all game audio (linear scale: 0.0 = silent, 1.0 = full).
 var volume: float = 1.0
 
+## When non-zero, used to seed all puzzle randomisation so outcomes are repeatable.
+## A value of zero signals that a fresh random seed should be used instead.
+var puzzle_seed: int = 0
+
+## True when the current session was started via the Daily Puzzle entry point.
+## Used to disable normal randomisation and reuse the daily seed.
+var is_daily_puzzle: bool = false
+
 ## True once the player has explicitly started a game (difficulty has been
 ## committed at least once). Used by the main menu to decide whether to
 ## auto-select a screen-size-appropriate difficulty on first load.
