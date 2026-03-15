@@ -395,7 +395,7 @@ func _build_hud() -> void:
 	_hud_hbox.offset_left   = 8 + safe_insets["left"]
 	_hud_hbox.offset_right  = -8 - safe_insets["right"]
 	_hud_hbox.offset_bottom = HUD_H
-	_hud_hbox.add_theme_constant_override("separation", 12)
+	_hud_hbox.add_theme_constant_override("separation", UIScale.px(16 if UIScale.is_mobile() else 12))
 	_hud.add_child(_hud_hbox)
 
 	_hud_buttons.clear()
@@ -463,6 +463,7 @@ func _make_hud_button(label_text: String) -> Button:
 	var portrait := UIScale.is_portrait()
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(18 if portrait else 16))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48))
 
 	var padding_v := UIScale.px(12.0 if portrait else 8.0)
 	var padding_h := UIScale.px(16.0 if portrait else 12.0)
@@ -701,7 +702,7 @@ func _build_settings_panel() -> void:
 	vbox.add_child(diff_lbl)
 
 	var diff_row := HBoxContainer.new()
-	diff_row.add_theme_constant_override("separation", 4)
+	diff_row.add_theme_constant_override("separation", UIScale.px(8 if UIScale.is_mobile() else 4))
 	vbox.add_child(diff_row)
 
 	_menu_diff_btns.clear()
@@ -876,6 +877,8 @@ func _make_menu_small_button(label_text: String) -> Button:
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	btn.add_theme_font_size_override("font_size", 12)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48 if UIScale.is_mobile() else 28))
+	var margin_v: int = UIScale.px(10 if UIScale.is_mobile() else 4)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -888,8 +891,8 @@ func _make_menu_small_button(label_text: String) -> Button:
 		sb.corner_radius_bottom_right = 5
 		sb.content_margin_left   = 6
 		sb.content_margin_right  = 6
-		sb.content_margin_top    = 4
-		sb.content_margin_bottom = 4
+		sb.content_margin_top    = margin_v
+		sb.content_margin_bottom = margin_v
 		btn.add_theme_stylebox_override(state, sb)
 	return btn
 
@@ -1055,7 +1058,7 @@ func _build_bottom_panel() -> void:
 
 	# Left section: Action buttons
 	var left_vbox := VBoxContainer.new()
-	left_vbox.add_theme_constant_override("separation", 8)
+	left_vbox.add_theme_constant_override("separation", UIScale.px(10 if UIScale.is_mobile() else 8))
 	left_vbox.custom_minimum_size = Vector2(UIScale.px(140), 0)
 	main_hbox.add_child(left_vbox)
 
@@ -1146,7 +1149,7 @@ func _build_bottom_panel() -> void:
 	right_vbox.add_child(boxes_scroll)
 
 	_box_vbox = VBoxContainer.new()
-	_box_vbox.add_theme_constant_override("separation", 4)
+	_box_vbox.add_theme_constant_override("separation", UIScale.px(8 if UIScale.is_mobile() else 4))
 	_box_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	boxes_scroll.add_child(_box_vbox)
 
@@ -1164,14 +1167,14 @@ func _build_bottom_panel() -> void:
 	_box_vbox.add_child(add_sep)
 
 	var add_row := HBoxContainer.new()
-	add_row.add_theme_constant_override("separation", 4)
+	add_row.add_theme_constant_override("separation", UIScale.px(8 if UIScale.is_mobile() else 4))
 	_box_vbox.add_child(add_row)
 
 	var name_edit := LineEdit.new()
 	name_edit.placeholder_text = "New box…"
 	name_edit.add_theme_font_size_override("font_size", UIScale.font_size(11))
 	name_edit.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	name_edit.custom_minimum_size = Vector2(0, UIScale.px(24))
+	name_edit.custom_minimum_size = Vector2(0, UIScale.px(48 if UIScale.is_mobile() else 24))
 	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_row.add_child(name_edit)
 
@@ -1198,7 +1201,9 @@ func _make_bottom_button(label_text: String) -> Button:
 	btn.add_theme_font_size_override("font_size", UIScale.font_size(13))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48))
 
+	var margin_v: int = UIScale.px(10)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -1211,8 +1216,8 @@ func _make_bottom_button(label_text: String) -> Button:
 		sb.corner_radius_bottom_right = 5
 		sb.content_margin_left   = 8
 		sb.content_margin_right  = 8
-		sb.content_margin_top    = 6
-		sb.content_margin_bottom = 6
+		sb.content_margin_top    = margin_v
+		sb.content_margin_bottom = margin_v
 		btn.add_theme_stylebox_override(state, sb)
 
 	return btn
@@ -2362,8 +2367,10 @@ func _append_box_button(box_idx: int) -> void:
 	btn.add_theme_font_size_override("font_size", 12)
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, UIScale.px(48 if UIScale.is_mobile() else 28))
 	btn.tooltip_text = "Open box: %s\n(drop pieces here to sort them)" % box.name
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var margin_v: int = UIScale.px(10 if UIScale.is_mobile() else 3)
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
 		match state:
@@ -2376,8 +2383,8 @@ func _append_box_button(box_idx: int) -> void:
 		sb.corner_radius_bottom_right = 5
 		sb.content_margin_left   = 6
 		sb.content_margin_right  = 6
-		sb.content_margin_top    = 3
-		sb.content_margin_bottom = 3
+		sb.content_margin_top    = margin_v
+		sb.content_margin_bottom = margin_v
 		btn.add_theme_stylebox_override(state, sb)
 
 	var i := box_idx
@@ -2397,7 +2404,8 @@ func _make_small_icon_button(label_text: String) -> Button:
 	btn.text = label_text
 	btn.add_theme_font_size_override("font_size", 14)
 	btn.add_theme_color_override("font_color", Color(0.88, 0.82, 0.98))
-	btn.custom_minimum_size = Vector2(26, 26)
+	var btn_size: int = UIScale.px(48 if UIScale.is_mobile() else 32)
+	btn.custom_minimum_size = Vector2(btn_size, btn_size)
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	for state in ["normal", "hover", "pressed"]:
 		var sb := StyleBoxFlat.new()
