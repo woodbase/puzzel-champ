@@ -245,6 +245,19 @@ var _pan_start_mouse: Vector2 = Vector2.ZERO
 ## Camera world position recorded when the current pan gesture started.
 var _pan_start_cam: Vector2 = Vector2.ZERO
 
+## Active touch points tracked for raw multi-touch gesture handling (Android).
+## Maps finger index → current screen position.
+var _touch_points: Dictionary = {}
+
+## True while a two-finger pinch/pan gesture is in progress on a touch screen.
+var _touch_gesture_active: bool = false
+
+## Finger distance at the start of the current gesture frame (updated each event).
+var _gesture_prev_dist: float = 0.0
+
+## Gesture midpoint (screen coords) at the start of the current gesture frame.
+var _gesture_prev_mid: Vector2 = Vector2.ZERO
+
 ## Base volume_db values for each AudioStreamPlayer (before volume scaling).
 const PICKUP_BASE_DB: float = -10.0
 const SNAP_BASE_DB: float = -6.0
@@ -603,12 +616,14 @@ func _settings_panel_height() -> int:
 # ─── Workspace zoom and pan ───────────────────────────────────────────────────
 
 ## Resets the workspace camera to the default 1:1 zoom centred on the viewport.
-## Also clears any in-progress pan gesture.
+## Also clears any in-progress pan gesture or multi-touch gesture state.
 func _reset_camera() -> void:
 	if _camera == null:
 		return
 	_zoom_level = 1.0
 	_panning = false
+	_touch_points.clear()
+	_touch_gesture_active = false
 	_camera.zoom = Vector2.ONE
 	_camera.position = get_viewport_rect().size * 0.5
 
@@ -679,6 +694,76 @@ func _unhandled_input(event: InputEvent) -> void:
 		var pg := event as InputEventPanGesture
 		_camera.position += pg.delta / _zoom_level
 		get_viewport().set_input_as_handled()
+
+
+## Handles raw multi-touch input for platforms (e.g. Android) that do not
+## synthesise InputEventMagnifyGesture / InputEventPanGesture from touch.
+##
+## Tracks up to two simultaneous finger contacts.  When exactly two fingers
+## are active the method:
+##   • computes pinch zoom from the change in inter-finger distance, and
+##   • pans the camera by the change in the gesture midpoint.
+##
+## Using _input (rather than _unhandled_input) lets the board consume touch
+## events before puzzle pieces' _input_event handlers see them, preventing
+## pieces from starting a drag while a two-finger gesture is in progress.
+func _input(event: InputEvent) -> void:
+	if _camera == null:
+		return
+
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_touch_points[touch.index] = touch.position
+		else:
+			_touch_points.erase(touch.index)
+
+		if _touch_points.size() >= 2:
+			# Second (or additional) finger landed – start a fresh gesture frame
+			# and cancel any piece drag that was in progress.
+			var keys: Array = _touch_points.keys()
+			var pos_a: Vector2 = _touch_points[keys[0]]
+			var pos_b: Vector2 = _touch_points[keys[1]]
+			_gesture_prev_dist = pos_a.distance_to(pos_b)
+			_gesture_prev_mid  = (pos_a + pos_b) * 0.5
+			if not _touch_gesture_active:
+				_touch_gesture_active = true
+				_cancel_all_piece_drags()
+			get_viewport().set_input_as_handled()
+		else:
+			_touch_gesture_active = false
+
+	elif event is InputEventScreenDrag and _touch_gesture_active:
+		# Update the stored position for the moving finger.
+		var drag := event as InputEventScreenDrag
+		_touch_points[drag.index] = drag.position
+
+		if _touch_points.size() >= 2:
+			var keys: Array = _touch_points.keys()
+			var pos_a: Vector2 = _touch_points[keys[0]]
+			var pos_b: Vector2 = _touch_points[keys[1]]
+			var new_dist: float = pos_a.distance_to(pos_b)
+			var new_mid: Vector2 = (pos_a + pos_b) * 0.5
+
+			# Pinch: zoom at the gesture midpoint proportional to distance change.
+			if _gesture_prev_dist > 0.0:
+				_zoom_at_point(new_dist / _gesture_prev_dist, new_mid)
+
+			# Pan: shift the camera by the midpoint delta (corrected for zoom).
+			_camera.position -= (new_mid - _gesture_prev_mid) / _zoom_level
+
+			_gesture_prev_dist = new_dist
+			_gesture_prev_mid  = new_mid
+
+		get_viewport().set_input_as_handled()
+
+
+## Cancels any in-progress piece drags without snapping.
+## Called when a multi-touch gesture begins so pieces don't fight the camera.
+func _cancel_all_piece_drags() -> void:
+	for piece in _pieces:
+		if is_instance_valid(piece):
+			piece.cancel_drag()
 
 
 ## Builds a floating game-menu panel anchored below the HUD bar.
