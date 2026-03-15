@@ -134,6 +134,7 @@ func _input(event: InputEvent) -> void:
 func _start_drag(mouse_pos: Vector2) -> void:
 	if _dragging:
 		return  # Guard: ignore if already dragging (e.g. touch + emulated mouse).
+	_pending_drag = false
 	_dragging = true
 	_drag_offset = global_position - mouse_pos
 	_original_z_index = z_index
