@@ -1468,6 +1468,9 @@ func _build_puzzle() -> void:
 	_pieces.clear()
 	_pieces_initial_positions.clear()
 
+	# Compute spawn bounds once before the loop to avoid per-piece allocations.
+	var spawn_bottom_reserved := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
+
 	for pd in piece_data_array:
 		var col: int = pd.grid_pos.x
 		var row: int = pd.grid_pos.y
@@ -1513,10 +1516,9 @@ func _build_puzzle() -> void:
 		# Spawn randomly; keep pieces below the HUD bar.
 		var spawn_half_w := _piece_size.x * 0.5
 		var spawn_half_h := _piece_size.y * 0.5
-		var bottom_panel_h := _get_bottom_reserved_height() if _bottom_panel_expanded else UIScale.safe_area_insets()["bottom"]
 		var spawn_pos := Vector2(
 			randf_range(spawn_half_w, viewport_size.x - spawn_half_w),
-			randf_range(HUD_H + spawn_half_h, viewport_size.y - bottom_panel_h - spawn_half_h)
+			randf_range(HUD_H + spawn_half_h, viewport_size.y - spawn_bottom_reserved - spawn_half_h)
 		)
 		piece.position = spawn_pos
 		_pieces_initial_positions.append(spawn_pos)

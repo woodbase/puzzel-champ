@@ -105,7 +105,7 @@ func font_size(base_pt: int) -> int:
 ## The safe area is the region of the screen not obscured by a notch, rounded
 ## corner, status bar, or system gesture strip.  Insets are the distances from
 ## each screen edge to the nearest safe boundary.
-## Returns a Dictionary with float keys "top", "bottom", "left", "right".
+## Returns a Dictionary with string keys "top", "bottom", "left", "right" and float values.
 func safe_area_insets() -> Dictionary:
 	return {
 		"top":    _safe_top,
