@@ -740,6 +740,13 @@ func _refresh_daily_buttons() -> void:
 		btn.tooltip_text = tooltip
 
 
+func _daily_already_completed() -> bool:
+	if GameState.has_completed_daily():
+		_show_error("Daily puzzle already completed")
+		return true
+	return false
+
+
 func _set_corner_radius(sb: StyleBoxFlat, r: int) -> void:
 	sb.corner_radius_top_left     = r
 	sb.corner_radius_top_right    = r
@@ -1070,6 +1077,8 @@ func _delete_user_gallery_item(index: int) -> void:
 
 ## Starts a puzzle with the provided seed; a seed of zero uses fresh randomness.
 func _start_puzzle(puzzle_seed: int, is_daily: bool) -> void:
+	if is_daily and _daily_already_completed():
+		return
 	if _selected_texture == null:
 		_show_error("Please select an image first.")
 		return
@@ -1104,6 +1113,8 @@ func _start_puzzle(puzzle_seed: int, is_daily: bool) -> void:
 ## jigsaw shape, and rotation disabled. Uses the first bundled gallery image so
 ## every player sees the same puzzle content.
 func _on_daily_start_pressed() -> void:
+	if _daily_already_completed():
+		return
 	if _gallery_textures.size() > 0:
 		_select_gallery_item(0)
 	if _selected_texture == null:
@@ -1133,6 +1144,8 @@ func _on_start_pressed() -> void:
 
 ## Starts the Daily Puzzle using the deterministic daily seed.
 func start_daily_puzzle() -> void:
+	if _daily_already_completed():
+		return
 	_start_puzzle(DailySeed.get_daily_seed(), true)
 
 
@@ -1191,6 +1204,8 @@ func _on_resume_pressed() -> void:
 ## Starts the daily puzzle using the first bundled gallery image and the
 ## currently selected difficulty/shape, seeded by today's date.
 func start_daily_puzzle() -> void:
+	if _daily_already_completed():
+		return
 	var daily_path := DEFAULT_IMAGE_PATHS[0] if DEFAULT_IMAGE_PATHS.size() > 0 else ""
 	var img := Image.load_from_file(daily_path) if daily_path != "" else null
 	if img == null:

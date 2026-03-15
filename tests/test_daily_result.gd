@@ -40,6 +40,22 @@ func test_has_completed_daily_checks_date_match() -> void:
 	assert_bool(gs.has_completed_daily("2026-03-15")).is_true()
 
 
+func test_record_daily_completion_ignores_replays() -> void:
+	var gs := GameStateScript.new()
+	gs._daily_result_path = _temp_daily_path
+
+	gs.record_daily_completion(10.0, "2026-03-15")
+	gs.record_daily_completion(5.0, "2026-03-15")
+
+	var gs2 := GameStateScript.new()
+	gs2._daily_result_path = _temp_daily_path
+	gs2._load_daily_result()
+
+	var result := gs2.get_daily_result()
+	assert_bool(gs2.has_completed_daily("2026-03-15")).is_true()
+	assert_float(result.get("time", 0.0)).is_equal(snappedf(10.0, 0.001))
+
+
 func _clear_temp_file() -> void:
 	if FileAccess.file_exists(_temp_daily_path):
 		var abs := ProjectSettings.globalize_path(_temp_daily_path)

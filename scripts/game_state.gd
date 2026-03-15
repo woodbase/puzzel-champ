@@ -243,6 +243,8 @@ func record_daily_completion(elapsed_time: float, date_string: String = "") -> v
 	var date := date_string
 	if date.is_empty():
 		date = Time.get_date_string_from_system()
+	if has_completed_daily(date):
+		return
 	_daily_result = {
 		"date": date,
 		"status": "completed",
