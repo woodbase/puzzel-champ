@@ -18,6 +18,16 @@ var is_locked: bool = false
 ## Whether this piece is currently being dragged.
 var _dragging: bool = false
 
+## Whether the player has pressed this piece but not yet exceeded the drag threshold.
+var _pending_drag: bool = false
+
+## The global position where the press started, used to measure drag distance.
+var _press_start: Vector2 = Vector2.ZERO
+
+## Minimum pixel movement required before a press is recognised as a drag.
+## Prevents accidental piece movement when tapping.
+const DRAG_THRESHOLD: float = 10.0
+
 ## Offset between the piece's position and the mouse when drag starts.
 var _drag_offset: Vector2 = Vector2.ZERO
 
@@ -55,7 +65,10 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			_start_drag(get_global_mouse_position())
+			# Record press position; actual drag begins only after DRAG_THRESHOLD
+			# is exceeded, preventing accidental moves when tapping.
+			_press_start = get_global_mouse_position()
+			_pending_drag = true
 			# Consume the event so overlapping pieces don't also start dragging,
 			# which could cause the wrong piece to snap into an incorrect position.
 			get_viewport().set_input_as_handled()
@@ -70,32 +83,50 @@ func _input_event(_viewport: Viewport, event: InputEvent, _shape_idx: int) -> vo
 		# double-invocation so only the first call takes effect.
 		var touch_event := event as InputEventScreenTouch
 		if touch_event.pressed:
-			_start_drag(touch_event.position)
+			# Record press position; actual drag begins only after DRAG_THRESHOLD
+			# is exceeded, preventing accidental moves when tapping.
+			_press_start = touch_event.position
+			_pending_drag = true
 			get_viewport().set_input_as_handled()
 
 
 func _input(event: InputEvent) -> void:
-	if not _dragging:
+	if not _dragging and not _pending_drag:
 		return
 
 	if event is InputEventMouseMotion:
-		_update_drag(get_global_mouse_position())
+		if _pending_drag and not _dragging:
+			# Start dragging once the cursor has moved far enough from the press
+			# position, so brief taps don't accidentally move pieces.
+			if get_global_mouse_position().distance_to(_press_start) >= DRAG_THRESHOLD:
+				_start_drag(get_global_mouse_position())
+		elif _dragging:
+			_update_drag(get_global_mouse_position())
 
 	elif event is InputEventScreenDrag:
-		# Keep the piece following the finger while it moves.
-		_update_drag((event as InputEventScreenDrag).position)
+		var drag_pos: Vector2 = (event as InputEventScreenDrag).position
+		if _pending_drag and not _dragging:
+			if drag_pos.distance_to(_press_start) >= DRAG_THRESHOLD:
+				_start_drag(drag_pos)
+		elif _dragging:
+			# Keep the piece following the finger while it moves.
+			_update_drag(drag_pos)
 
 	elif event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and not mouse_event.pressed:
-			_end_drag()
+			_pending_drag = false
+			if _dragging:
+				_end_drag()
 
 	elif event is InputEventScreenTouch:
 		# Finger lifted – end the drag.  _end_drag guards against the
 		# matching MouseButton release that emulate_mouse_from_touch also fires.
 		var touch_event := event as InputEventScreenTouch
 		if not touch_event.pressed:
-			_end_drag()
+			_pending_drag = false
+			if _dragging:
+				_end_drag()
 
 
 ## Begins dragging the piece.
