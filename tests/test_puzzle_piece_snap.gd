@@ -126,6 +126,59 @@ func test_cancel_drag_clears_pending_drag() -> void:
 	assert_int(piece._drag_touch_index).is_equal(-1)
 
 
+## Snapping a piece emits the piece_placed signal so PuzzleBoard can update
+## its counter, play audio, and check for puzzle completion.
+func test_piece_placed_signal_emitted_on_snap() -> void:
+	var target := Vector2(200.0, 150.0)
+	var piece := _make_piece(target, 50.0)
+
+	monitor_signals(piece)
+
+	piece.global_position = target + Vector2(20.0, 0.0)
+	piece._dragging = true
+	piece._end_drag()
+
+	assert_signal(piece).is_emitted("piece_placed")
+
+
+## Snapping must work correctly when GameState.feedback_visual is disabled
+## so that toggling visual effects never interferes with core snap logic.
+func test_snap_works_with_visual_feedback_disabled() -> void:
+	var saved := GameState.feedback_visual
+	GameState.feedback_visual = false
+
+	var target := Vector2(100.0, 80.0)
+	var piece := _make_piece(target, 50.0)
+
+	piece.global_position = target + Vector2(25.0, 0.0)
+	piece._dragging = true
+	piece._end_drag()
+
+	GameState.feedback_visual = saved
+
+	assert_bool(piece.is_locked).is_true()
+	assert_vector2(piece.global_position).is_equal(target)
+
+
+## Snapping must work correctly when GameState.feedback_haptic is disabled
+## so that toggling haptic effects never interferes with core snap logic.
+func test_snap_works_with_haptic_feedback_disabled() -> void:
+	var saved := GameState.feedback_haptic
+	GameState.feedback_haptic = false
+
+	var target := Vector2(150.0, 120.0)
+	var piece := _make_piece(target, 50.0)
+
+	piece.global_position = target + Vector2(10.0, 0.0)
+	piece._dragging = true
+	piece._end_drag()
+
+	GameState.feedback_haptic = saved
+
+	assert_bool(piece.is_locked).is_true()
+	assert_vector2(piece.global_position).is_equal(target)
+
+
 ## A drag event from a different finger than the one that started the drag
 ## must be ignored so multi-touch gestures don't cause erratic piece movement.
 func test_drag_ignores_wrong_touch_index() -> void:

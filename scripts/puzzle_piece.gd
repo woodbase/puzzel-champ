@@ -302,22 +302,24 @@ func _spawn_lock_particles() -> void:
 
 
 ## Plays a brief scale-bounce and colour-flash animation on the sprite.
-## Enhanced with anticipation: squash → expand → elastic bounce back.
+## Squash → expand → elastic bounce back to natural 1× scale with a gold flash.
+## The sprite may be at drag scale (DRAG_SCALE_FACTOR) when this is called, so
+## all phases target absolute values relative to Vector2.ONE so the locked piece
+## always settles at its natural size.
 func _play_snap_animation() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite == null:
 		return
-	var base_scale: Vector2 = sprite.scale
 	var tween := create_tween()
 	# Phase 0: Quick anticipation squash (0.05 s) for snappier feel.
-	tween.tween_property(sprite, "scale", base_scale * 0.92, 0.05) \
+	tween.tween_property(sprite, "scale", Vector2(0.92, 0.92), 0.05) \
 		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	# Phase 1: Pop up and flash to gold (0.12 s), both properties in parallel.
-	tween.tween_property(sprite, "scale", base_scale * 1.25, 0.12) \
+	tween.tween_property(sprite, "scale", Vector2(1.25, 1.25), 0.12) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	tween.parallel().tween_property(sprite, "modulate", Color(1.6, 1.4, 0.2, 1.0), 0.12)
-	# Phase 2: Elastic spring back to normal (0.22 s) with stronger overshoot
+	# Phase 2: Elastic spring back to natural scale (0.22 s) with stronger overshoot
 	# for a more satisfying snap feel; colour fade runs in parallel.
-	tween.tween_property(sprite, "scale", base_scale, 0.22) \
+	tween.tween_property(sprite, "scale", Vector2.ONE, 0.22) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
 	tween.parallel().tween_property(sprite, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.22)
