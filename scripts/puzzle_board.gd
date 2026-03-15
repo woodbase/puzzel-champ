@@ -159,6 +159,10 @@ var _hud_hbox: HBoxContainer = null
 ## refreshed when the layout changes.
 var _hud_buttons: Array[Button] = []
 
+## The right-side "Menu" button in the HUD bar, stored separately so its
+## width component of custom_minimum_size can be updated when HUD_H changes.
+var _hud_menu_btn: Button = null
+
 ## Sorting-box data list.  Each element is a Dictionary with keys:
 ##   "name"   – display label (String)
 ##   "pieces" – piece nodes currently stored in this box (Array)
@@ -441,9 +445,10 @@ func _build_hud() -> void:
 	settings_btn.icon = ICON_MENU
 	settings_btn.pressed.connect(_toggle_settings_panel)
 	settings_btn.tooltip_text = "Game menu"
-	settings_btn.custom_minimum_size = Vector2(HUD_H - 8, 0)
+	settings_btn.custom_minimum_size = Vector2(HUD_H - 8, UIScale.px(48))
 	_hud_hbox.add_child(settings_btn)
 	_hud_buttons.append(settings_btn)
+	_hud_menu_btn = settings_btn
 
 	_save_slot_label = Label.new()
 	_save_slot_label.add_theme_font_size_override("font_size", UIScale.font_size(12))
@@ -500,6 +505,7 @@ func _on_layout_changed() -> void:
 		_hud_hbox.offset_left   = 8 + safe["left"]
 		_hud_hbox.offset_right  = -8 - safe["right"]
 		_hud_hbox.offset_bottom = HUD_H
+		_hud_hbox.add_theme_constant_override("separation", UIScale.px(16 if UIScale.is_mobile() else 12))
 
 	if _counter_label != null:
 		_counter_label.add_theme_font_size_override("font_size", UIScale.font_size(13))
@@ -513,9 +519,11 @@ func _on_layout_changed() -> void:
 	var portrait := UIScale.is_portrait()
 	var padding_v := UIScale.px(12.0 if portrait else 8.0)
 	var padding_h := UIScale.px(16.0 if portrait else 12.0)
+	var min_h: int = UIScale.px(48)
 	for btn in _hud_buttons:
 		btn.add_theme_font_size_override(
 			"font_size", UIScale.font_size(18 if portrait else 16))
+		btn.custom_minimum_size = Vector2(btn.custom_minimum_size.x, min_h)
 		for state in ["normal", "hover", "pressed"]:
 			var sb: StyleBoxFlat = btn.get_theme_stylebox(state) as StyleBoxFlat
 			if sb != null:
@@ -523,6 +531,11 @@ func _on_layout_changed() -> void:
 				sb.content_margin_right  = padding_h
 				sb.content_margin_top    = padding_v
 				sb.content_margin_bottom = padding_v
+
+	# Keep the Menu button wide enough to comfortably display its icon + text
+	# and preserve the 48px touch-target height set above.
+	if _hud_menu_btn != null:
+		_hud_menu_btn.custom_minimum_size = Vector2(HUD_H - 8, min_h)
 
 	# Reposition the settings panel below the (possibly resized) HUD bar.
 	if _settings_panel != null:
