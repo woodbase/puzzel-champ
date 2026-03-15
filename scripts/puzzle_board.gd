@@ -187,6 +187,10 @@ var _box_view_title: Label = null
 ## Index of the sorting box currently displayed in the view overlay (-1 = none).
 var _open_box_index: int = -1
 
+## Index of the sorting box whose button is highlighted as a drop target while
+## the player is dragging a piece (-1 = none highlighted).
+var _drag_highlight_box_idx: int = -1
+
 ## Floating popup shown when hovering a sorting-box button to preview stored pieces.
 var _box_hover_popup: Control = null
 
@@ -345,6 +349,8 @@ func _process(delta: float) -> void:
 		if current_pos != _last_drag_pos:
 			_last_drag_pos = current_pos
 			queue_redraw()
+	if _dragged_piece != null:
+		_update_box_drop_highlight()
 
 
 ## Draws a highlight rectangle at the target position of the dragged piece when
@@ -1694,6 +1700,7 @@ func _on_piece_released() -> void:
 	var released_piece = _dragged_piece
 	_dragged_piece = null
 	_last_drag_pos = Vector2.ZERO
+	_clear_box_drop_highlight()
 	queue_redraw()
 	# If the piece was not snapped into its final slot, check whether it was
 	# dropped over a sorting-box button and, if so, store it there.
@@ -2867,6 +2874,75 @@ func _try_add_piece_to_box(piece) -> void:
 			return
 
 
+## Updates the drop-target highlight on sorting-box buttons while a piece is
+## being dragged.  Highlights the button under the mouse cursor and clears the
+## highlight when the cursor moves away.
+func _update_box_drop_highlight() -> void:
+	var mouse_pos := get_viewport().get_mouse_position()
+	var hovered_idx: int = -1
+	for i in _sorting_boxes.size():
+		var btn: Button = _sorting_boxes[i].get("button")
+		if btn != null and is_instance_valid(btn) and btn.get_global_rect().has_point(mouse_pos):
+			hovered_idx = i
+			break
+	if hovered_idx != _drag_highlight_box_idx:
+		_clear_box_drop_highlight()
+		if hovered_idx != -1:
+			_set_box_drop_highlight(hovered_idx)
+
+
+## Applies a drop-target highlight style to the sorting-box button at box_idx.
+func _set_box_drop_highlight(box_idx: int) -> void:
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	var btn: Button = _sorting_boxes[box_idx].get("button")
+	if btn == null or not is_instance_valid(btn):
+		return
+	_drag_highlight_box_idx = box_idx
+	var sb := _make_box_button_style(Color(0.42, 0.72, 0.42), true)
+	btn.add_theme_stylebox_override("normal", sb)
+
+
+## Removes the drop-target highlight from the currently highlighted box button,
+## restoring it to its default style.
+func _clear_box_drop_highlight() -> void:
+	if _drag_highlight_box_idx == -1:
+		return
+	var box_idx := _drag_highlight_box_idx
+	_drag_highlight_box_idx = -1
+	if box_idx < 0 or box_idx >= _sorting_boxes.size():
+		return
+	var btn: Button = _sorting_boxes[box_idx].get("button")
+	if btn == null or not is_instance_valid(btn):
+		return
+	var sb := _make_box_button_style(Color(0.25, 0.16, 0.48), false)
+	btn.add_theme_stylebox_override("normal", sb)
+
+
+## Creates a StyleBoxFlat for a sorting-box button with the given background
+## color.  When highlighted is true a contrasting green border is added to
+## signal that the box is a valid drop target.
+func _make_box_button_style(bg_color: Color, highlighted: bool) -> StyleBoxFlat:
+	var margin_v: int = UIScale.px(10 if UIScale.is_mobile() else 3)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg_color
+	if highlighted:
+		sb.border_color = Color(0.55, 0.90, 0.55)
+		sb.border_width_left   = 2
+		sb.border_width_right  = 2
+		sb.border_width_top    = 2
+		sb.border_width_bottom = 2
+	sb.corner_radius_top_left     = 5
+	sb.corner_radius_top_right    = 5
+	sb.corner_radius_bottom_left  = 5
+	sb.corner_radius_bottom_right = 5
+	sb.content_margin_left   = 6
+	sb.content_margin_right  = 6
+	sb.content_margin_top    = margin_v
+	sb.content_margin_bottom = margin_v
+	return sb
+
+
 ## Adds a new custom sorting box and appends its button to the panel.
 func _add_custom_box(box_name: String) -> void:
 	var new_idx := _sorting_boxes.size()
@@ -2888,3 +2964,4 @@ func _clear_all_sorting_boxes() -> void:
 			btn.text = "%s [0]" % box.name
 	_close_box_view()
 	_hide_box_hover_preview()
+	_drag_highlight_box_idx = -1
