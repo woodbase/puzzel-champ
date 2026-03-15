@@ -279,10 +279,11 @@ func _build_ui() -> void:
 	# Outer margin – stored so it can be updated when the layout changes.
 	_outer_margin = MarginContainer.new()
 	_outer_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_outer_margin.add_theme_constant_override("margin_left",   UIScale.px(40))
-	_outer_margin.add_theme_constant_override("margin_right",  UIScale.px(40))
-	_outer_margin.add_theme_constant_override("margin_top",    UIScale.px(28))
-	_outer_margin.add_theme_constant_override("margin_bottom", UIScale.px(28))
+	var safe_insets := UIScale.safe_area_insets()
+	_outer_margin.add_theme_constant_override("margin_left",   UIScale.px(40) + ceili(safe_insets["left"]))
+	_outer_margin.add_theme_constant_override("margin_right",  UIScale.px(40) + ceili(safe_insets["right"]))
+	_outer_margin.add_theme_constant_override("margin_top",    UIScale.px(28) + ceili(safe_insets["top"]))
+	_outer_margin.add_theme_constant_override("margin_bottom", UIScale.px(28) + ceili(safe_insets["bottom"]))
 	add_child(_outer_margin)
 
 	var root_vbox := VBoxContainer.new()
@@ -1402,10 +1403,11 @@ func _update_content_layout() -> void:
 
 	# Update outer margins and title regardless of orientation change.
 	if _outer_margin != null:
-		_outer_margin.add_theme_constant_override("margin_left",   UIScale.px(40))
-		_outer_margin.add_theme_constant_override("margin_right",  UIScale.px(40))
-		_outer_margin.add_theme_constant_override("margin_top",    UIScale.px(28))
-		_outer_margin.add_theme_constant_override("margin_bottom", UIScale.px(28))
+		var sa := UIScale.safe_area_insets()
+		_outer_margin.add_theme_constant_override("margin_left",   UIScale.px(40) + ceili(sa["left"]))
+		_outer_margin.add_theme_constant_override("margin_right",  UIScale.px(40) + ceili(sa["right"]))
+		_outer_margin.add_theme_constant_override("margin_top",    UIScale.px(28) + ceili(sa["top"]))
+		_outer_margin.add_theme_constant_override("margin_bottom", UIScale.px(28) + ceili(sa["bottom"]))
 
 	if _title_lbl != null:
 		_title_lbl.add_theme_font_size_override(
