@@ -17,6 +17,9 @@ const SHAPES: Array[Dictionary] = [
 	{"label": "Jigsaw", "key": "jigsaw"},
 ]
 
+## Daily seed helper used by the Daily Puzzle entry point.
+const DailySeed := preload("res://scripts/daily_seed.gd")
+
 # ─── UI icon assets ───────────────────────────────────────────────────────────
 const ICON_PLAY     := preload("res://gfx/ui/icons/icon_play.png")
 const ICON_TROPHY   := preload("res://gfx/ui/icons/icon_trophy.png")
@@ -1027,7 +1030,8 @@ func _delete_user_gallery_item(index: int) -> void:
 			_set_gallery_item_style(_gallery_items[_active_gallery_idx], true)
 
 
-func _on_start_pressed() -> void:
+## Starts a puzzle with the provided seed; a seed of zero uses fresh randomness.
+func _start_puzzle(puzzle_seed: int, is_daily: bool) -> void:
 	if _selected_texture == null:
 		_show_error("Please select an image first.")
 		return
@@ -1036,6 +1040,13 @@ func _on_start_pressed() -> void:
 	GameState.image_path    = _selected_path
 	GameState.gallery_index = _active_gallery_idx
 	GameState.piece_shape   = SHAPES[_shape_index]["key"]
+	var chosen_seed := puzzle_seed
+	if chosen_seed == 0:
+		var seed_rng := RandomNumberGenerator.new()
+		seed_rng.randomize()
+		chosen_seed = int(seed_rng.randi())
+	GameState.puzzle_seed   = chosen_seed
+	GameState.is_daily_puzzle = is_daily
 	if _use_custom:
 		var cr := _cols_rows_from_piece_count(_custom_piece_count)
 		GameState.cols = cr.x
@@ -1045,6 +1056,15 @@ func _on_start_pressed() -> void:
 		GameState.cols = d["cols"]
 		GameState.rows = d["rows"]
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")
+
+
+func _on_start_pressed() -> void:
+	_start_puzzle(0, false)
+
+
+## Starts the Daily Puzzle using the deterministic daily seed.
+func start_daily_puzzle() -> void:
+	_start_puzzle(DailySeed.get_daily_seed(), true)
 
 
 ## Resumes the saved puzzle from the single save slot.
@@ -1089,6 +1109,8 @@ func _on_resume_pressed() -> void:
 	GameState.rows                   = int(save_data.get("rows", GameState.rows))
 	GameState.piece_shape            = str(save_data.get("piece_shape", GameState.piece_shape))
 	GameState.allow_rotation         = bool(save_data.get("allow_rotation", false))
+	GameState.puzzle_seed            = int(save_data.get("puzzle_seed", 0))
+	GameState.is_daily_puzzle        = bool(save_data.get("is_daily_puzzle", false))
 	GameState.difficulty_explicitly_set = true
 	GameState.resume_save            = true
 	get_tree().change_scene_to_file("res://scenes/puzzle_board.tscn")

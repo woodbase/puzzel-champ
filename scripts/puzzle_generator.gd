@@ -27,7 +27,7 @@ class PieceData:
 ## Generates PieceData for all pieces in a cols x rows grid.
 ## Border edges are FLAT; shared internal edges are randomly IN or OUT
 ## with the neighbour always receiving the opposite value.
-func generate_edges(cols: int, rows: int) -> Array:
+func generate_edges(cols: int, rows: int, rng: RandomNumberGenerator = null) -> Array:
 	var pieces := []
 	for row in range(rows):
 		for col in range(cols):
@@ -41,19 +41,26 @@ func generate_edges(cols: int, rows: int) -> Array:
 
 			# Right edge (shared with right neighbour's left edge).
 			if col < cols - 1:
-				var et: int = EdgeType.IN if randi() % 2 == 0 else EdgeType.OUT
+				var et: int = EdgeType.IN if _rand_bit(rng) == 0 else EdgeType.OUT
 				piece.edges["right"] = et
 				var neighbour: PieceData = pieces[row * cols + (col + 1)]
 				neighbour.edges["left"] = EdgeType.OUT if et == EdgeType.IN else EdgeType.IN
 
 			# Bottom edge (shared with lower neighbour's top edge).
 			if row < rows - 1:
-				var et: int = EdgeType.IN if randi() % 2 == 0 else EdgeType.OUT
+				var et: int = EdgeType.IN if _rand_bit(rng) == 0 else EdgeType.OUT
 				piece.edges["bottom"] = et
 				var neighbour: PieceData = pieces[(row + 1) * cols + col]
 				neighbour.edges["top"] = EdgeType.OUT if et == EdgeType.IN else EdgeType.IN
 
 	return pieces
+
+
+## Returns a random bit using the provided RNG or the global generator.
+func _rand_bit(rng: RandomNumberGenerator) -> int:
+	if rng == null:
+		return randi() % 2
+	return rng.randi() % 2
 
 
 ## Fraction of piece_size used as the tab protrusion depth.
