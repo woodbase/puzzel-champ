@@ -52,6 +52,13 @@ const DRAG_SCALE_FACTOR: float = 1.08
 ## actual piece size rather than using a fixed pixel value.
 var snap_distance: float = 40.0
 
+## Minimum squared-pixel movement required to update the piece position during
+## dragging.  Touch events on mobile can fire at 120 Hz or faster, producing
+## many identical or near-identical positions per visual frame.  Skipping
+## updates smaller than √MIN_DRAG_MOVE_SQ ≈ 0.5 px avoids redundant Area2D
+## transform recalculations and Sprite2D redraws without any perceptible lag.
+const MIN_DRAG_MOVE_SQ: float = 0.25
+
 ## Buffer seconds added after particle lifetime before the node is freed.
 const PARTICLE_CLEANUP_DELAY: float = 0.2
 
@@ -170,8 +177,13 @@ func _start_drag(mouse_pos: Vector2) -> void:
 
 
 ## Moves the piece to follow the mouse.
+## Position is only written when the intended new position differs from the
+## current one by more than √MIN_DRAG_MOVE_SQ pixels, skipping the redundant
+## Area2D transform / AABB recalculation for sub-pixel touch events.
 func _update_drag(mouse_pos: Vector2) -> void:
-	global_position = mouse_pos + _drag_offset
+	var new_pos: Vector2 = mouse_pos + _drag_offset
+	if new_pos.distance_squared_to(global_position) >= MIN_DRAG_MOVE_SQ:
+		global_position = new_pos
 
 
 ## Cancels an in-progress drag without attempting to snap the piece.
