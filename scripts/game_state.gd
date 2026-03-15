@@ -12,6 +12,12 @@ var has_save: bool = false
 ## instead of starting a fresh puzzle, then clears it immediately after use.
 var resume_save: bool = false
 
+## True when the current session was started as the daily puzzle.
+var is_daily_puzzle: bool = false
+
+## Deterministic seed used for the daily puzzle layout generation.
+var daily_seed: int = 0
+
 ## True when the game is running on a mobile device (Android or iOS).
 ## Detected once at startup; read-only after _ready().
 var is_mobile: bool = false
