@@ -58,7 +58,8 @@ When the last piece is placed, a layered celebration sequence plays:
 
 4. **Completion overlay card** – A "Puzzle Complete!" card fades in and scales up from 0.8× to
    1.0× over 0.35 s (ease-out back transition) with a simultaneous backdrop fade.  The card
-   provides clear confirmation of completion and offers "Back to Menu" / "New Puzzle" actions.
+   provides clear confirmation of completion and offers "Play Again" / "New Puzzle" / "Main Menu"
+   actions so the player can continue playing easily after finishing.
 
 This layered approach was selected because:
 - Each layer targets a different part of the screen (board → overlay → full screen)
