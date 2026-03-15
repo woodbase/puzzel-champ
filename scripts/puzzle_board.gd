@@ -201,10 +201,12 @@ var _last_portrait: bool = false
 ## Bottom panel containing controls, reference image, and sorting boxes.
 var _bottom_panel: Control = null
 
-## Toggle button to show/hide the bottom panel.
+## Toggle button in the top bar that hides/shows the bottom panel to expand
+## the puzzle workspace (mobile only).
 var _bottom_panel_toggle_btn: Button = null
 
-## Whether the bottom panel is currently expanded.
+## Whether the bottom panel is currently visible (workspace in normal mode).
+## When false the bottom panel is hidden and the full screen is puzzle workspace.
 var _bottom_panel_expanded: bool = true
 
 ## Height of the bottom panel when expanded.
@@ -252,6 +254,11 @@ const MIN_VOLUME_LINEAR: float = 0.0001
 
 ## Background colour of the board entry fade-in overlay.
 const ENTRY_OVERLAY_COLOR := Color(0.05, 0.05, 0.10, 1.0)
+
+## Font colour for the workspace-expand toggle button when the bottom panel is
+## visible (normal state) and when the workspace is expanded (panel hidden).
+const HUD_BTN_NORMAL_COLOR   := Color(0.88, 0.82, 0.98)
+const HUD_BTN_ACTIVE_COLOR   := Color(0.55, 0.85, 0.55)
 
 ## Time in seconds between each piece's scale-in animation during board entry.
 ## Enhanced with accelerating stagger for smoother flow.
@@ -440,6 +447,16 @@ func _build_hud() -> void:
 	_counter_label.add_theme_color_override("font_color", Color(0.75, 0.70, 0.85))
 	_counter_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	info_hbox.add_child(_counter_label)
+
+	# Expand workspace toggle – mobile only.  Hides the bottom panel so the
+	# full screen is available for puzzle solving.
+	if UIScale.is_mobile():
+		_bottom_panel_toggle_btn = _make_hud_button("▼")
+		_bottom_panel_toggle_btn.tooltip_text = "Expand workspace"
+		_bottom_panel_toggle_btn.custom_minimum_size = Vector2(UIScale.px(48), UIScale.px(48))
+		_bottom_panel_toggle_btn.pressed.connect(_toggle_workspace_expand)
+		_hud_hbox.add_child(_bottom_panel_toggle_btn)
+		_hud_buttons.append(_bottom_panel_toggle_btn)
 
 	var settings_btn := _make_hud_button("Menu")
 	settings_btn.icon = ICON_MENU
@@ -1014,6 +1031,23 @@ func _toggle_preview() -> void:
 		_zoom_overlay.visible = false
 	if _preview_toggle_btn != null:
 		_preview_toggle_btn.text = "Preview: On" if _preview_panel.visible else "Preview: Off"
+
+
+## Toggles workspace expand mode on mobile: hides the bottom panel to give the
+## player the full screen for puzzle solving.  Pressing again restores the panel.
+func _toggle_workspace_expand() -> void:
+	_bottom_panel_expanded = not _bottom_panel_expanded
+
+	if _bottom_panel != null:
+		_bottom_panel.visible = _bottom_panel_expanded
+
+	# Update toggle button label and colour to reflect the current state.
+	if _bottom_panel_toggle_btn != null:
+		_bottom_panel_toggle_btn.text = "▼" if _bottom_panel_expanded else "▲"
+		_bottom_panel_toggle_btn.tooltip_text = "Expand workspace" if _bottom_panel_expanded else "Restore panel"
+		# Highlight the button when workspace is expanded (panel hidden).
+		var active_color := HUD_BTN_ACTIVE_COLOR if not _bottom_panel_expanded else HUD_BTN_NORMAL_COLOR
+		_bottom_panel_toggle_btn.add_theme_color_override("font_color", active_color)
 
 
 ## Applies the current GameState.volume to all AudioStreamPlayers.
